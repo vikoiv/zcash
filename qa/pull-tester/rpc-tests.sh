@@ -40,6 +40,7 @@ testScripts=(
     'reindex.py'
     'decodescript.py'
     'disablewallet.py'
+    'sendheaders.py'
     'zcjoinsplit.py'
     'zcjoinsplitdoublespend.py'
     'getblocktemplate.py'
