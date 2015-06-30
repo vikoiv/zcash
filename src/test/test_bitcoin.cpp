@@ -35,7 +35,7 @@ ZCJoinSplit *pzcashParams;
 extern bool fPrintToConsole;
 extern void noui_connect();
 
-JoinSplitTestingSetup::JoinSplitTestingSetup(CBaseChainParams::Network network) : BasicTestingSetup(network)
+JoinSplitTestingSetup::JoinSplitTestingSetup(const std::string& chainName) : BasicTestingSetup(chainName)
 {
     boost::filesystem::path pk_path = ZC_GetParamsDir() / "sprout-proving.key";
     boost::filesystem::path vk_path = ZC_GetParamsDir() / "sprout-verifying.key";
@@ -47,14 +47,14 @@ JoinSplitTestingSetup::~JoinSplitTestingSetup()
     delete pzcashParams;
 }
 
-BasicTestingSetup::BasicTestingSetup(CBaseChainParams::Network network)
+BasicTestingSetup::BasicTestingSetup(const std::string& chainName)
 {
     assert(init_and_check_sodium() != -1);
     ECC_Start();
     SetupEnvironment();
     fPrintToDebugLog = false; // don't want to write to debug.log file
     fCheckBlockIndex = true;
-    SelectParams(network);
+    SelectParams(chainName);
     noui_connect();
 }
 
@@ -63,7 +63,7 @@ BasicTestingSetup::~BasicTestingSetup()
     ECC_Stop();
 }
 
-TestingSetup::TestingSetup(CBaseChainParams::Network network) : JoinSplitTestingSetup(network)
+TestingSetup::TestingSetup(const std::string& chainName) : JoinSplitTestingSetup(chainName)
 {
 #ifdef ENABLE_WALLET
         bitdb.MakeMock();
