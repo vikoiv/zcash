@@ -50,17 +50,6 @@ void static BatchWriteNullifier(CLevelDBBatch &batch, const uint256 &nf, const b
         batch.Write(make_pair(DB_NULLIFIER, nf), true);
 }
 
-void static BatchWriteCoins(CLevelDBBatch &batch, const uint256 &hash, const CCoins &coins) {
-    if (coins.IsPruned())
-        batch.Erase(make_pair(DB_COINS, hash));
-    else
-        batch.Write(make_pair(DB_COINS, hash), coins);
-}
-
-void static BatchWriteHashBestChain(CLevelDBBatch &batch, const uint256 &hash) {
-    batch.Write(DB_BEST_BLOCK, hash);
-}
-
 void static BatchWriteHashBestAnchor(CLevelDBBatch &batch, const uint256 &hash) {
     batch.Write(DB_BEST_ANCHOR, hash);
 }
@@ -68,7 +57,8 @@ void static BatchWriteHashBestAnchor(CLevelDBBatch &batch, const uint256 &hash) 
 CCoinsViewDB::CCoinsViewDB(std::string dbName, size_t nCacheSize, bool fMemory, bool fWipe) : db(GetDataDir() / dbName, nCacheSize, fMemory, fWipe) {
 }
 
-CCoinsViewDB::CCoinsViewDB(size_t nCacheSize, bool fMemory, bool fWipe) : db(GetDataDir() / "chainstate", nCacheSize, fMemory, fWipe) {
+CCoinsViewDB::CCoinsViewDB(size_t nCacheSize, bool fMemory, bool fWipe) : db(GetDataDir() / "chainstate", nCacheSize, fMemory, fWipe, true) 
+{
 }
 
 
@@ -118,12 +108,15 @@ bool CCoinsViewDB::BatchWrite(CCoinsMap &mapCoins,
                               const uint256 &hashAnchor,
                               CAnchorsMap &mapAnchors,
                               CNullifiersMap &mapNullifiers) {
-    CLevelDBBatch batch;
+    CLevelDBBatch batch(db.GetObfuscateKey());
     size_t count = 0;
     size_t changed = 0;
     for (CCoinsMap::iterator it = mapCoins.begin(); it != mapCoins.end();) {
         if (it->second.flags & CCoinsCacheEntry::DIRTY) {
-            BatchWriteCoins(batch, it->first, it->second.coins);
+            if (it->second.coins.IsPruned())
+                batch.Erase(make_pair(DB_COINS, it->first));
+            else
+                batch.Write(make_pair(DB_COINS, it->first), it->second.coins);
             changed++;
         }
         count++;
@@ -150,7 +143,7 @@ bool CCoinsViewDB::BatchWrite(CCoinsMap &mapCoins,
     }
 
     if (!hashBlock.IsNull())
-        BatchWriteHashBestChain(batch, hashBlock);
+        batch.Write(DB_BEST_BLOCK, hashBlock);
     if (!hashAnchor.IsNull())
         BatchWriteHashBestAnchor(batch, hashAnchor);
 
@@ -238,7 +231,7 @@ bool CCoinsViewDB::GetStats(CCoinsStats &stats) const {
 }
 
 bool CBlockTreeDB::WriteBatchSync(const std::vector<std::pair<int, const CBlockFileInfo*> >& fileInfo, int nLastFile, const std::vector<const CBlockIndex*>& blockinfo) {
-    CLevelDBBatch batch;
+    CLevelDBBatch batch(GetObfuscateKey());
     for (std::vector<std::pair<int, const CBlockFileInfo*> >::const_iterator it=fileInfo.begin(); it != fileInfo.end(); it++) {
         batch.Write(make_pair(DB_BLOCK_FILES, it->first), *it->second);
     }
@@ -254,7 +247,7 @@ bool CBlockTreeDB::ReadTxIndex(const uint256 &txid, CDiskTxPos &pos) {
 }
 
 bool CBlockTreeDB::WriteTxIndex(const std::vector<std::pair<uint256, CDiskTxPos> >&vect) {
-    CLevelDBBatch batch;
+    CLevelDBBatch batch(GetObfuscateKey());
     for (std::vector<std::pair<uint256,CDiskTxPos> >::const_iterator it=vect.begin(); it!=vect.end(); it++)
         batch.Write(make_pair(DB_TXINDEX, it->first), it->second);
     return WriteBatch(batch);
