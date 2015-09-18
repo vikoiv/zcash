@@ -56,12 +56,13 @@ testScriptsExt=(
     'keypool.py'
     'receivedby.py'
     'rpcbind_test.py'
-#   'script_test.py'
+#    'script_test.py'
     'smartfees.py'
     'maxblocksinflight.py'
     'invalidblockrequest.py'
 #    'forknotify.py'
     'p2p-acceptblock.py'
+    'maxuploadtarget.py'
 );
 
 if [ "x$ENABLE_ZMQ" = "x1" ]; then
