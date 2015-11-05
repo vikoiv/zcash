@@ -20,3 +20,22 @@ In this version, it is only enforced for peers that send protocol versions
 `>=170011`. For the next major version it is planned that this restriction will be
 removed. It is recommended to update SPV clients to check for the `NODE_BLOOM`
 service bit for nodes that report versions newer than 170011.
+
+Reduce upload traffic
+---------------------
+
+A major part of the outbound traffic is caused by serving historic blocks to
+other nodes in initial block download state.
+
+It is now possible to reduce the total upload traffic via the `-maxuploadtarget`
+parameter. This is *not* a hard limit but a threshold to minimize the outbound
+traffic. When the limit is about to be reached, the uploaded data is cut by not
+serving historic blocks (blocks older than one week).
+Moreover, any SPV peer is disconnected when they request a filtered block.
+
+This option can be specified in MiB per day and is turned off by default
+(`-maxuploadtarget=0`).
+The recommended minimum is 144 * MAX_BLOCK_SIZE (currently 144MB) per day.
+
+A more detailed documentation about keeping traffic low can be found in
+[/doc/reducetraffic.md](/doc/reducetraffic.md).
