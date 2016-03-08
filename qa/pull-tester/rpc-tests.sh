@@ -29,6 +29,7 @@ testScripts=(
     'merkle_blocks.py'
     'signrawtransactions.py'
     'walletbackup.py'
+    'addressindex.py'
     'zcjoinsplit.py'
     'zcjoinsplitdoublespend.py'
     'getblocktemplate.py'
