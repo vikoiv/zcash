@@ -434,6 +434,66 @@ bool getAddressesFromParams(const Array& params, std::vector<std::pair<uint160, 
 
 }
 
+Value getaddressdeltas(const Array& params, bool fHelp)
+{
+    if (fHelp || params.size() != 1 || params[0].type() != obj_type)
+        throw runtime_error(
+            "getaddressdeltas\n"
+            "\nReturns all changes for an address (requires addressindex to be enabled).\n"
+            "\nResult\n"
+            "[\n"
+            "  {\n"
+            "    \"satoshis\"  (number) The difference of satoshis\n"
+            "    \"txid\"  (string) The related txid\n"
+            "    \"index\"  (number) The related input or output index\n"
+            "    \"height\"  (number) The block height\n"
+            "    \"hash\"  (string) The address hash\n"
+            "    \"type\"  (number) The address type 0 for pubkeyhash 1 for scripthash\n"
+            "  }\n"
+            "]\n"
+        );
+
+
+    Value startValue = find_value(params[0].get_obj(), "start");
+    Value endValue = find_value(params[0].get_obj(), "end");
+
+    if (startValue.type() != int_type || endValue.type() != int_type) {
+        throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "Start and end values are expected to be block heights");
+    }
+
+    int start = startValue.get_int();
+    int end = startValue.get_int();
+
+    std::vector<std::pair<uint160, int> > addresses;
+
+    if (!getAddressesFromParams(params, addresses)) {
+        throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "Invalid address");
+    }
+
+    std::vector<std::pair<CAddressIndexKey, CAmount> > addressIndex;
+
+    for (std::vector<std::pair<uint160, int> >::iterator it = addresses.begin(); it != addresses.end(); it++) {
+        if (!GetAddressIndex((*it).first, (*it).second, addressIndex, start, end)) {
+            throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "No information available for address");
+        }
+    }
+
+    Array result;
+
+    for (std::vector<std::pair<CAddressIndexKey, CAmount> >::const_iterator it=addressIndex.begin(); it!=addressIndex.end(); it++) {
+        Object delta;
+        delta.push_back(Pair("satoshis", it->second));
+        delta.push_back(Pair("txid", it->first.txhash.GetHex()));
+        delta.push_back(Pair("index", it->first.index));
+        delta.push_back(Pair("height", it->first.blockHeight));
+        delta.push_back(Pair("hash", it->first.hashBytes.GetHex()));
+        delta.push_back(Pair("type", (int)it->first.type));
+        result.push_back(delta);
+    }
+
+    return result;
+}
+
 Value getaddressbalance(const Array& params, bool fHelp)
 {
     if (fHelp || params.size() != 1)
