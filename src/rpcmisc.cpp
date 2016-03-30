@@ -430,8 +430,11 @@ bool getAddressesFromParams(const Array& params, std::vector<std::pair<uint160, 
     }
 
     return true;
+}
 
-
+bool heightSort(std::pair<CAddressUnspentKey, CAddressUnspentValue> a,
+                std::pair<CAddressUnspentKey, CAddressUnspentValue> b) {
+    return a.second.blockHeight < b.second.blockHeight;
 }
 
 Value getaddressutxos(const Array& params, bool fHelp)
@@ -467,6 +470,8 @@ Value getaddressutxos(const Array& params, bool fHelp)
         }
     }
 
+    std::sort(unspentOutputs.begin(), unspentOutputs.end(), heightSort);
+
     Array result;
 
     for (std::vector<std::pair<CAddressUnspentKey, CAddressUnspentValue> >::const_iterator it=unspentOutputs.begin(); it!=unspentOutputs.end(); it++) {
@@ -477,6 +482,7 @@ Value getaddressutxos(const Array& params, bool fHelp)
         output.push_back(Pair("outputIndex", it->first.index));
         output.push_back(Pair("script", HexStr(it->second.script.begin(), it->second.script.end())));
         output.push_back(Pair("satoshis", it->second.satoshis));
+        output.push_back(Pair("height", it->second.blockHeight));
         result.push_back(output);
     }
 
