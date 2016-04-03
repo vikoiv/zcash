@@ -37,14 +37,14 @@ class CTxMemPoolEntry
 {
 private:
     CTransaction tx;
-    CAmount nFee; //! Cached to avoid expensive parent-transaction lookups
-    size_t nTxSize; //! ... and avoid recomputing tx size
-    size_t nModSize; //! ... and modified size for priority
-    size_t nUsageSize; //! ... and total memory usage
-    int64_t nTime; //! Local time when entering the mempool
-    double dPriority; //! Priority when entering the mempool
-    unsigned int nHeight; //! Chain height when entering the mempool
-    bool hadNoDependencies; //! Not dependent on any other txs when it entered the mempool
+    CAmount nFee;              //!< Cached to avoid expensive parent-transaction lookups
+    size_t nTxSize;            //!< ... and avoid recomputing tx size
+    size_t nModSize;           //!< ... and modified size for priority
+    size_t nUsageSize;         //!< ... and total memory usage
+    int64_t nTime;             //!< Local time when entering the mempool
+    double dPriority;          //!< Priority when entering the mempool
+    unsigned int nHeight;      //!< Chain height when entering the mempool
+    bool hadNoDependencies;    //!< Not dependent on any other txs when it entered the mempool
 
 public:
     CTxMemPoolEntry(const CTransaction& _tx, const CAmount& _nFee,
@@ -95,8 +95,8 @@ private:
     unsigned int nTransactionsUpdated;
     CBlockPolicyEstimator* minerPolicyEstimator;
 
-    uint64_t totalTxSize = 0; //! sum of all mempool tx' byte sizes
-    uint64_t cachedInnerUsage; //! sum of dynamic memory usage of all the map elements (NOT the maps themselves)
+    uint64_t totalTxSize = 0;  //!< sum of all mempool tx' byte sizes
+    uint64_t cachedInnerUsage; //!< sum of dynamic memory usage of all the map elements (NOT the maps themselves)
 
 public:
     mutable CCriticalSection cs;
