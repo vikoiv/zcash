@@ -147,6 +147,7 @@ extern std::string HelpExampleRpc(std::string methodname, std::string args);
 extern void EnsureWalletIsUnlocked();
 
 extern json_spirit::Value getconnectioncount(const json_spirit::Array& params, bool fHelp); // in rpcnet.cpp
+extern json_spirit::Value getaddressmempool(const json_spirit::Array& params, bool fHelp);
 extern json_spirit::Value getaddressutxos(const json_spirit::Array& params, bool fHelp);
 extern json_spirit::Value getaddressdeltas(const json_spirit::Array& params, bool fHelp);
 extern json_spirit::Value getaddresstxids(const json_spirit::Array& params, bool fHelp);
