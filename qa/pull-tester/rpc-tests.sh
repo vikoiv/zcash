@@ -38,6 +38,7 @@ testScripts=(
     'reindex.py'
     'addressindex.py'
     'timestampindex.py'
+    'spentindex.py'
     'decodescript.py'
     'disablewallet.py'
     'zcjoinsplit.py'
