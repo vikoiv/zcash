@@ -256,6 +256,7 @@ extern json_spirit::Value verifychain(const json_spirit::Array& params, bool fHe
 extern json_spirit::Value getchaintips(const json_spirit::Array& params, bool fHelp);
 extern json_spirit::Value invalidateblock(const json_spirit::Array& params, bool fHelp);
 extern json_spirit::Value reconsiderblock(const json_spirit::Array& params, bool fHelp);
+extern json_spirit::Value getspentinfo(const json_spirit::Array& params, bool fHelp);
 
 extern json_spirit::Value getblocksubsidy(const json_spirit::Array& params, bool fHelp);
 
