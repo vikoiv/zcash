@@ -700,3 +700,42 @@ Value getaddresstxids(const Array& params, bool fHelp)
     return result;
 
 }
+
+Value getspentinfo(const Array& params, bool fHelp)
+{
+
+    if (fHelp || params.size() != 1 || params[0].type() == obj_type)
+        throw runtime_error(
+            "getspentinfo\n"
+            "\nReturns the txid and index where an output is spent.\n"
+            "\nResult\n"
+            "{\n"
+            "  \"txid\"  (string) The transaction id\n"
+            "  \"index\"  (number) The spending input index\n"
+            "  ,...\n"
+            "}\n"
+        );
+
+    Value txidValue = find_value(params[0].get_obj(), "txid");
+    Value indexValue = find_value(params[0].get_obj(), "index");
+
+    if (txidValue.type() != str_type || indexValue.type() != int_type) {
+        throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "Invalid txid or index");
+    }
+
+    uint256 txid = ParseHashV(txidValue, "txid");
+    int outputIndex = indexValue.get_int();
+
+    CSpentIndexKey key(txid, outputIndex);
+    CSpentIndexValue value;
+
+    if (!GetSpentIndex(key, value)) {
+        throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "Unable to get spent info");
+    }
+
+    Object obj;
+    obj.push_back(Pair("txid", value.txid.GetHex()));
+    obj.push_back(Pair("index", (int)value.inputIndex));
+
+    return obj;
+}
