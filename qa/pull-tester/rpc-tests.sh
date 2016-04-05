@@ -31,6 +31,7 @@ testScripts=(
     'walletbackup.py'
     'addressindex.py'
     'timestampindex.py'
+    'spentindex.py'
     'zcjoinsplit.py'
     'zcjoinsplitdoublespend.py'
     'getblocktemplate.py'
