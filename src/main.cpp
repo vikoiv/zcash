@@ -2366,8 +2366,7 @@ void PruneAndFlush() {
 }
 
 /** Update chainActive and related internal data structures. */
-void static UpdateTip(CBlockIndex *pindexNew) {
-    const CChainParams& chainParams = Params();
+void static UpdateTip(CBlockIndex *pindexNew, const CChainParams& chainParams) {
     chainActive.SetTip(pindexNew);
 
     // New best block
@@ -2408,6 +2407,7 @@ void static UpdateTip(CBlockIndex *pindexNew) {
 /** Disconnect chainActive's tip. */
 bool static DisconnectTip(CValidationState& state, const Consensus::Params& consensusParams)
 {
+    const CChainParams& chainparams = Params(); // TODO replace consensusParams parameter
     CBlockIndex *pindexDelete = chainActive.Tip();
     assert(pindexDelete);
     mempool.check(pcoinsTip);
@@ -2445,7 +2445,7 @@ bool static DisconnectTip(CValidationState& state, const Consensus::Params& cons
     mempool.removeCoinbaseSpends(pcoinsTip, pindexDelete->nHeight);
     mempool.check(pcoinsTip);
     // Update chainActive and related variables.
-    UpdateTip(pindexDelete->pprev);
+    UpdateTip(pindexDelete->pprev, chainparams);
     // Get the current commitment tree
     ZCIncrementalMerkleTree newTree;
     assert(pcoinsTip->GetAnchorAt(pcoinsTip->GetBestAnchor(), newTree));
@@ -2514,7 +2514,7 @@ bool static ConnectTip(CValidationState& state, const CChainParams& chainparams,
     mempool.removeForBlock(pblock->vtx, pindexNew->nHeight, txConflicted, !IsInitialBlockDownload());
     mempool.check(pcoinsTip);
     // Update chainActive & related variables.
-    UpdateTip(pindexNew);
+    UpdateTip(pindexNew, chainparams);
     // Tell wallet about transactions that went from mempool
     // to conflicted:
     BOOST_FOREACH(const CTransaction &tx, txConflicted) {
