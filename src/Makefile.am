@@ -82,6 +82,7 @@ LIBZCASH_H = \
 .PHONY: FORCE check-security
 # bitcoin core #
 BITCOIN_CORE_H = \
+  addressindex.h \
   addrman.h \
   alert.h \
   amount.h \
