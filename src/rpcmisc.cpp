@@ -736,6 +736,7 @@ Value getspentinfo(const Array& params, bool fHelp)
     Object obj;
     obj.push_back(Pair("txid", value.txid.GetHex()));
     obj.push_back(Pair("index", (int)value.inputIndex));
+    obj.push_back(Pair("height", value.blockHeight));
 
     return obj;
 }
