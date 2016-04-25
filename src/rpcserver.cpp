@@ -301,7 +301,7 @@ static const CRPCCommand vRPCCommands[] =
     { "blockchain",         "verifytxoutproof",       &verifytxoutproof,       true  },
     { "blockchain",         "gettxoutsetinfo",        &gettxoutsetinfo,        true  },
     { "blockchain",         "verifychain",            &verifychain,            true  },
-    { "blockchain",         "getspentinfo",           &getspentinfo,           true  },
+    { "blockchain",         "getspentinfo",           &getspentinfo,           false },
 
     /* Mining */
     { "mining",             "getblocktemplate",       &getblocktemplate,       true  },
@@ -327,7 +327,7 @@ static const CRPCCommand vRPCCommands[] =
     { "rawtransactions",    "signrawtransaction",     &signrawtransaction,     false }, /* uses wallet if enabled */
 
     /* Address index */
-    { "addressindex",       "getaddressmempool",      &getaddressmempool,      false },
+    { "addressindex",       "getaddressmempool",      &getaddressmempool,      true  },
     { "addressindex",       "getaddressutxos",        &getaddressutxos,        false },
     { "addressindex",       "getaddressdeltas",       &getaddressdeltas,       false },
     { "addressindex",       "getaddresstxids",        &getaddresstxids,        false },
