@@ -228,6 +228,7 @@ std::set<std::vector<eh_index>> Equihash<N,K>::BasicSolve(const eh_HashState& ba
 
     // 1) Generate first list
     LogPrint("pow", "Generating first list\n");
+    size_t hashLen = N/8;
     std::vector<FullStepRow> X;
     X.reserve(init_size);
     for (eh_index i = 0; i < init_size; i++) {
@@ -239,7 +240,7 @@ std::set<std::vector<eh_index>> Equihash<N,K>::BasicSolve(const eh_HashState& ba
         LogPrint("pow", "Round %d:\n", r);
         // 2a) Sort the list
         LogPrint("pow", "- Sorting list\n");
-        std::sort(X.begin(), X.end());
+        std::sort(X.begin(), X.end(), CompareSR(hashLen));
 
         LogPrint("pow", "- Finding collisions\n");
         int i = 0;
@@ -285,6 +286,8 @@ std::set<std::vector<eh_index>> Equihash<N,K>::BasicSolve(const eh_HashState& ba
             X.erase(X.begin()+posFree, X.end());
             X.shrink_to_fit();
         }
+
+        hashLen -= CollisionByteLength;
     }
 
     // k+1) Find a collision on last 2n(k+1) bits
@@ -292,7 +295,7 @@ std::set<std::vector<eh_index>> Equihash<N,K>::BasicSolve(const eh_HashState& ba
     std::set<std::vector<eh_index>> solns;
     if (X.size() > 1) {
         LogPrint("pow", "- Sorting list\n");
-        std::sort(X.begin(), X.end());
+        std::sort(X.begin(), X.end(), CompareSR(hashLen));
         LogPrint("pow", "- Finding collisions\n");
         for (int i = 0; i < X.size() - 1; i++) {
             FullStepRow res(X[i], X[i+1], 0);
@@ -370,6 +373,7 @@ std::set<std::vector<eh_index>> Equihash<N,K>::OptimisedSolve(const eh_HashState
 
         // 1) Generate first list
         LogPrint("pow", "Generating first list\n");
+        size_t hashLen = N/8;
         std::vector<TruncatedStepRow> Xt;
         Xt.reserve(init_size);
         for (eh_index i = 0; i < init_size; i++) {
@@ -381,7 +385,7 @@ std::set<std::vector<eh_index>> Equihash<N,K>::OptimisedSolve(const eh_HashState
             LogPrint("pow", "Round %d:\n", r);
             // 2a) Sort the list
             LogPrint("pow", "- Sorting list\n");
-            std::sort(Xt.begin(), Xt.end());
+            std::sort(Xt.begin(), Xt.end(), CompareSR(hashLen));
 
             LogPrint("pow", "- Finding collisions\n");
             int i = 0;
@@ -426,13 +430,15 @@ std::set<std::vector<eh_index>> Equihash<N,K>::OptimisedSolve(const eh_HashState
                 Xt.erase(Xt.begin()+posFree, Xt.end());
                 Xt.shrink_to_fit();
             }
+
+            hashLen -= CollisionByteLength;
         }
 
         // k+1) Find a collision on last 2n(k+1) bits
         LogPrint("pow", "Final round:\n");
         if (Xt.size() > 1) {
             LogPrint("pow", "- Sorting list\n");
-            std::sort(Xt.begin(), Xt.end());
+            std::sort(Xt.begin(), Xt.end(), CompareSR(hashLen));
             LogPrint("pow", "- Finding collisions\n");
             for (int i = 0; i < Xt.size() - 1; i++) {
                 TruncatedStepRow res(Xt[i], Xt[i+1], 0);
@@ -454,6 +460,7 @@ std::set<std::vector<eh_index>> Equihash<N,K>::OptimisedSolve(const eh_HashState
     int invalidCount = 0;
     for (eh_trunc* partialSoln : partialSolns) {
         // 1) Generate first list of possibilities
+        size_t hashLen = N/8;
         std::vector<std::vector<FullStepRow>> X;
         X.reserve(soln_size);
         for (eh_index i = 0; i < soln_size; i++) {
@@ -477,7 +484,7 @@ std::set<std::vector<eh_index>> Equihash<N,K>::OptimisedSolve(const eh_HashState
                 std::vector<FullStepRow> ic(X[v]);
                 ic.reserve(X[v].size() + X[v+1].size());
                 ic.insert(ic.end(), X[v+1].begin(), X[v+1].end());
-                std::sort(ic.begin(), ic.end());
+                std::sort(ic.begin(), ic.end(), CompareSR(hashLen));
                 CollideBranches(ic, CollisionByteLength, CollisionBitLength + 1, partialSoln[(1<<r)*v], partialSoln[(1<<r)*(v+1)]);
 
                 // 2v) Check if this has become an invalid solution
@@ -488,6 +495,7 @@ std::set<std::vector<eh_index>> Equihash<N,K>::OptimisedSolve(const eh_HashState
             }
 
             X = Xc;
+            hashLen -= CollisionByteLength;
         }
 
         // We are at the top of the tree
