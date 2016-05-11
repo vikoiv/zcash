@@ -98,7 +98,15 @@ static const CRPCConvertParam vRPCConvertParams[] =
     { "zcbenchmark", 1 },
     { "zcbenchmark", 2 },
     { "getblocksubsidy", 0},
-    { "z_importkey", 1 }
+    { "z_importkey", 1 },
+    { "getblockhashes", 0 },
+    { "getblockhashes", 1 },
+    { "getspentinfo", 0},
+    { "getaddresstxids", 0},
+    { "getaddressbalance", 0},
+    { "getaddressdeltas", 0},
+    { "getaddressutxos", 0},
+    { "getaddressmempool", 0},
 };
 
 class CRPCConvertTable
