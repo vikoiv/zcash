@@ -106,7 +106,15 @@ static const CRPCConvertParam vRPCConvertParams[] =
     { "z_sendmany", 3},
     { "z_getoperationstatus", 0},
     { "z_getoperationresult", 0},
-    { "z_importkey", 1 }
+    { "z_importkey", 1 },
+    { "getblockhashes", 0 },
+    { "getblockhashes", 1 },
+    { "getspentinfo", 0},
+    { "getaddresstxids", 0},
+    { "getaddressbalance", 0},
+    { "getaddressdeltas", 0},
+    { "getaddressutxos", 0},
+    { "getaddressmempool", 0},
 };
 
 class CRPCConvertTable
