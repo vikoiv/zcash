@@ -36,6 +36,14 @@ int Equihash<N,K>::InitialiseState(eh_HashState& base_state)
                                                          personalization);
 }
 
+void GenerateHash(const eh_HashState& base_state, size_t len, eh_index i, unsigned char* hash)
+{
+    eh_HashState state;
+    state = base_state;
+    crypto_generichash_blake2b_update(&state, (unsigned char*) &i, sizeof(eh_index));
+    crypto_generichash_blake2b_final(&state, hash, len);
+}
+
 void EhIndexToArray(const eh_index i, unsigned char* array)
 {
     assert(sizeof(eh_index) == 4);
@@ -71,13 +79,28 @@ eh_index UntruncateIndex(const eh_trunc t, const eh_index r, const unsigned int 
     return (i << (ilen - 8)) | r;
 }
 
+// Checks if the intersection of a and b is empty
+bool DistinctIndices(std::vector<eh_index> a, std::vector<eh_index> b)
+{
+    std::sort(a.begin(), a.end());
+    std::sort(b.begin(), b.end());
+
+    unsigned int i = 0;
+    for (unsigned int j = 0; j < b.size(); j++) {
+        while (a[i] < b[j]) {
+            i++;
+            if (i == a.size()) { return true; }
+        }
+        assert(a[i] >= b[j]);
+        if (a[i] == b[j]) { return false; }
+    }
+    return true;
+}
+
 template<size_t WIDTH>
 StepRow<WIDTH>::StepRow(unsigned int n, const eh_HashState& base_state, eh_index i)
 {
-    eh_HashState state;
-    state = base_state;
-    crypto_generichash_blake2b_update(&state, (unsigned char*) &i, sizeof(eh_index));
-    crypto_generichash_blake2b_final(&state, hash, n/8);
+    GenerateHash(base_state, n/8, i, hash);
 }
 
 template<size_t WIDTH> template<size_t W>
@@ -147,10 +170,57 @@ bool HasCollision(StepRow<WIDTH>& a, StepRow<WIDTH>& b, int l)
 }
 
 template<size_t WIDTH>
-TruncatedStepRow<WIDTH>::TruncatedStepRow(unsigned int n, const eh_HashState& base_state, eh_index i, unsigned int ilen) :
-        StepRow<WIDTH> {n, base_state, i}
+TruncatedStepRow<WIDTH>::TruncatedStepRow(eh_index i) :
+        StepRow<WIDTH> { }
 {
-    hash[n/8] = TruncateIndex(i, ilen);
+    EhIndexToArray(i, hash);
+}
+
+// Assumes the TruncatedStepRow contains no XORed hash and full indices
+template<size_t WIDTH>
+bool GenerateXor(const eh_HashState& base_state, const TruncatedStepRow<WIDTH>& a, size_t len, size_t lenIndices, unsigned char* hash)
+{
+    assert(lenIndices <= WIDTH);
+    unsigned char tmp[len];
+    std::fill(hash, hash+len, 0);
+    for (int i = 0; i < lenIndices; i += sizeof(eh_index)) {
+        GenerateHash(base_state, len, ArrayToEhIndex(a.hash+i), tmp);
+        for (int j = 0; j < len; j++)
+            hash[j] ^= tmp[j];
+    }
+}
+
+// Assumes the TruncatedStepRows contain no XORed hash and full indices
+template<size_t WIDTH> template<size_t W>
+TruncatedStepRow<WIDTH>::TruncatedStepRow(const eh_HashState& base_state, const TruncatedStepRow<W>& a, const TruncatedStepRow<W>& b, size_t len, size_t lenIndices, int trim, size_t ilen) :
+        StepRow<WIDTH> {a}
+{
+    assert(lenIndices <= W);
+    unsigned char a_hash[len];
+    unsigned char b_hash[len];
+
+    GenerateXor(base_state, a, len, lenIndices, a_hash);
+    GenerateXor(base_state, b, len, lenIndices, b_hash);
+
+    for (int i = trim; i < len; i++)
+        hash[i-trim] = a_hash[i] ^ b_hash[i];
+
+    int j = 0;
+    if (a.IndicesBefore(b)) {
+        for (int i = 0; i < lenIndices; i += sizeof(eh_index)) {
+            hash[len-trim+(j++)] = TruncateIndex(ArrayToEhIndex(a.hash+i), ilen);
+        }
+        for (int i = 0; i < lenIndices; i += sizeof(eh_index)) {
+            hash[len-trim+(j++)] = TruncateIndex(ArrayToEhIndex(b.hash+i), ilen);
+        }
+    } else {
+        for (int i = 0; i < lenIndices; i += sizeof(eh_index)) {
+            hash[len-trim+(j++)] = TruncateIndex(ArrayToEhIndex(b.hash+i), ilen);
+        }
+        for (int i = 0; i < lenIndices; i += sizeof(eh_index)) {
+            hash[len-trim+(j++)] = TruncateIndex(ArrayToEhIndex(a.hash+i), ilen);
+        }
+    }
 }
 
 template<size_t WIDTH> template<size_t W>
@@ -178,11 +248,46 @@ TruncatedStepRow<WIDTH>& TruncatedStepRow<WIDTH>::operator=(const TruncatedStepR
 }
 
 template<size_t WIDTH>
+std::vector<eh_index> TruncatedStepRow<WIDTH>::GetIndices(size_t lenIndices) const
+{
+    std::vector<eh_index> ret;
+    for (int i = 0; i < lenIndices; i += sizeof(eh_index)) {
+        ret.push_back(ArrayToEhIndex(hash+i));
+    }
+    return ret;
+}
+
+template<size_t WIDTH>
 eh_trunc* TruncatedStepRow<WIDTH>::GetTruncatedIndices(size_t len, size_t lenIndices) const
 {
     eh_trunc* p = new eh_trunc[lenIndices];
     std::copy(hash+len, hash+len+lenIndices, p);
     return p;
+}
+
+// Assumes the TruncatedStepRows contain no XORed hash and full indices
+template<size_t WIDTH>
+bool HashingHasCollision(const eh_HashState& base_state, TruncatedStepRow<WIDTH>& a, TruncatedStepRow<WIDTH>& b, size_t len, size_t lenIndices, int l)
+{
+    assert(l <= len);
+    unsigned char a_hash[len];
+    unsigned char b_hash[len];
+
+    GenerateXor(base_state, a, len, lenIndices, a_hash);
+    GenerateXor(base_state, b, len, lenIndices, b_hash);
+
+    bool res = true;
+    for (int j = 0; j < l; j++)
+        res &= a_hash[j] == b_hash[j];
+    return res;
+}
+
+template<size_t Len> template<size_t W>
+bool CompareTSR<Len>::operator()(const TruncatedStepRow<W>& a, const TruncatedStepRow<W>& b)
+{
+    GenerateXor(base_state, a, Len, lenIndices, a_hash);
+    GenerateXor(base_state, b, Len, lenIndices, b_hash);
+    return memcmp(a_hash, b_hash, Len) < 0;
 }
 
 template<unsigned int N, unsigned int K>
@@ -340,20 +445,35 @@ std::set<std::vector<eh_index>> Equihash<N,K>::OptimisedSolve(const eh_HashState
 
         // 1) Generate first list
         LogPrint("pow", "Generating first list\n");
+        bool trunc = false;
+        bool truncNext = false;
+        size_t lenFullIndices = sizeof(eh_index);
         size_t hashLen = N/8;
         size_t lenIndices = sizeof(eh_trunc);
         std::vector<TruncatedStepRow<TruncatedWidth>> Xt;
         Xt.reserve(init_size);
         for (eh_index i = 0; i < init_size; i++) {
-            Xt.emplace_back(N, base_state, i, CollisionBitLength + 1);
+            Xt.emplace_back(i);
         }
 
         // 3) Repeat step 2 until 2n/(k+1) bits remain
         for (int r = 1; r < K && Xt.size() > 0; r++) {
             LogPrint("pow", "Round %d:\n", r);
+            // ...) When trimmed indices plus the truncated XOR becomes smaller
+            //      than the full index tuple, switch to truncating indices
+            if (!trunc && (hashLen + (sizeof(eh_trunc)*(1<<(r-1)))) <
+                                     (sizeof(eh_index)*(1<<(r-1)))) {
+                LogPrint("pow", "- Switching to truncating indices\n");
+                truncNext = true;
+            }
+
             // 2a) Sort the list
             LogPrint("pow", "- Sorting list\n");
-            std::sort(Xt.begin(), Xt.end(), CompareSR(hashLen));
+            if (trunc) {
+                std::sort(Xt.begin(), Xt.end(), CompareSR(hashLen));
+            } else {
+                std::sort(Xt.begin(), Xt.end(), CompareTSR<N/8>(base_state, lenFullIndices));
+            }
 
             LogPrint("pow", "- Finding collisions\n");
             int i = 0;
@@ -362,16 +482,26 @@ std::set<std::vector<eh_index>> Equihash<N,K>::OptimisedSolve(const eh_HashState
             while (i < Xt.size() - 1) {
                 // 2b) Find next set of unordered pairs with collisions on the next n/(k+1) bits
                 int j = 1;
-                while (i+j < Xt.size() &&
-                        HasCollision(Xt[i], Xt[i+j], CollisionByteLength)) {
+                while (i+j < Xt.size() && (trunc ?
+                        HasCollision(Xt[i], Xt[i+j], CollisionByteLength) :
+                        HashingHasCollision(base_state, Xt[i], Xt[i+j], N/8, lenFullIndices, N/8-hashLen+CollisionByteLength))) {
                     j++;
                 }
 
                 // 2c) Calculate tuples (X_i ^ X_j, (i, j))
                 for (int l = 0; l < j - 1; l++) {
                     for (int m = l + 1; m < j; m++) {
-                        // We truncated, so don't check for distinct indices here
-                        Xc.emplace_back(Xt[i+l], Xt[i+m], hashLen, lenIndices, CollisionByteLength);
+                        if (trunc) {
+                            // We truncated, so don't check for distinct indices here
+                            Xc.emplace_back(Xt[i+l], Xt[i+m], hashLen, lenIndices, CollisionByteLength);
+                        } else if (DistinctIndices(Xt[i+l], Xt[i+m], lenIndices)) {
+                            if (truncNext) {
+                                // Change to storing XOR and truncating indices
+                                Xc.emplace_back(base_state, Xt[i+l], Xt[i+m], N/8, lenFullIndices, N/8-hashLen+CollisionByteLength, CollisionBitLength + 1);
+                            } else {
+                                Xc.emplace_back(Xt[i+l], Xt[i+m], 0, lenFullIndices, 0);
+                            }
+                        }
                     }
                 }
 
@@ -399,6 +529,8 @@ std::set<std::vector<eh_index>> Equihash<N,K>::OptimisedSolve(const eh_HashState
                 Xt.shrink_to_fit();
             }
 
+            trunc = truncNext;
+            lenFullIndices *= 2;
             hashLen -= CollisionByteLength;
             lenIndices *= 2;
         }

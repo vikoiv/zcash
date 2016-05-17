@@ -23,6 +23,7 @@ typedef uint8_t eh_trunc;
 
 eh_index ArrayToEhIndex(const unsigned char* array);
 eh_trunc TruncateIndex(const eh_index i, const unsigned int ilen);
+bool DistinctIndices(std::vector<eh_index> a, std::vector<eh_index> b);
 
 template<size_t WIDTH>
 class StepRow
@@ -35,6 +36,7 @@ protected:
     unsigned char hash[WIDTH];
 
 public:
+    StepRow() { };
     StepRow(unsigned int n, const eh_HashState& base_state, eh_index i);
     ~StepRow() { }
 
@@ -96,16 +98,42 @@ class TruncatedStepRow : public StepRow<WIDTH>
     using StepRow<WIDTH>::hash;
 
 public:
-    TruncatedStepRow(unsigned int n, const eh_HashState& base_state, eh_index i, unsigned int ilen);
+    TruncatedStepRow(eh_index i);
     ~TruncatedStepRow() { }
 
     TruncatedStepRow(const TruncatedStepRow<WIDTH>& a) : StepRow<WIDTH> {a} { }
     template<size_t W>
+    TruncatedStepRow(const eh_HashState& base_state, const TruncatedStepRow<W>& a, const TruncatedStepRow<W>& b, size_t len, size_t lenIndices, int trim, size_t ilen);
+    template<size_t W>
     TruncatedStepRow(const TruncatedStepRow<W>& a, const TruncatedStepRow<W>& b, size_t len, size_t lenIndices, int trim);
     TruncatedStepRow& operator=(const TruncatedStepRow<WIDTH>& a);
 
+    inline bool IndicesBefore(const TruncatedStepRow<WIDTH>& a) const { return ArrayToEhIndex(hash) < ArrayToEhIndex(a.hash); }
     inline bool IndicesBefore(const TruncatedStepRow<WIDTH>& a, size_t len, size_t lenIndices) const { return memcmp(hash+len, a.hash+len, lenIndices) < 0; }
+    std::vector<eh_index> GetIndices(size_t lenIndices) const;
     eh_trunc* GetTruncatedIndices(size_t len, size_t lenIndices) const;
+
+    template<size_t W>
+    friend bool GenerateXor(const eh_HashState& base_state, const TruncatedStepRow<W>& a, size_t len, size_t lenIndices, unsigned char* hash);
+};
+
+template<size_t WIDTH>
+bool GenerateXor(const eh_HashState& base_state, const TruncatedStepRow<WIDTH>& a, size_t len, size_t lenIndices, unsigned char* hash);
+
+template<size_t Len>
+class CompareTSR
+{
+private:
+    eh_HashState base_state;
+    size_t lenIndices;
+    unsigned char a_hash[Len];
+    unsigned char b_hash[Len];
+
+public:
+    CompareTSR(const eh_HashState& state, size_t l) : base_state {state}, lenIndices{l} { }
+
+    template<size_t W>
+    bool operator()(const TruncatedStepRow<W>& a, const TruncatedStepRow<W>& b);
 };
 
 template<unsigned int N, unsigned int K>

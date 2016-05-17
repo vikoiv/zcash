@@ -12,20 +12,17 @@ bool DistinctIndices(const FullStepRow<WIDTH>& a, const FullStepRow<WIDTH>& b, s
 {
     std::vector<eh_index> aSrt = a.GetIndices(len, lenIndices);
     std::vector<eh_index> bSrt = b.GetIndices(len, lenIndices);
+    return DistinctIndices(aSrt, bSrt);
+}
 
-    std::sort(aSrt.begin(), aSrt.end());
-    std::sort(bSrt.begin(), bSrt.end());
-
-    unsigned int i = 0;
-    for (unsigned int j = 0; j < bSrt.size(); j++) {
-        while (aSrt[i] < bSrt[j]) {
-            i++;
-            if (i == aSrt.size()) { return true; }
-        }
-        assert(aSrt[i] >= bSrt[j]);
-        if (aSrt[i] == bSrt[j]) { return false; }
-    }
-    return true;
+// Checks if the intersection of a.indices and b.indices is empty
+// Assumes the TruncatedStepRows contain no XORed hash and full indices
+template<size_t WIDTH>
+bool DistinctIndices(const TruncatedStepRow<WIDTH>& a, const TruncatedStepRow<WIDTH>& b, size_t lenIndices)
+{
+    std::vector<eh_index> aSrt = a.GetIndices(lenIndices);
+    std::vector<eh_index> bSrt = b.GetIndices(lenIndices);
+    return DistinctIndices(aSrt, bSrt);
 }
 
 template<size_t WIDTH>
