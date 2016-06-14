@@ -20,6 +20,8 @@
 #include <stdexcept>
 
 #include <boost/optional.hpp>
+#include <boost/thread/executors/basic_thread_pool.hpp>
+#include <boost/thread/future.hpp>
 
 template<unsigned int N, unsigned int K>
 int Equihash<N,K>::InitialiseState(eh_HashState& base_state)
@@ -346,6 +348,75 @@ void CollideBranches(std::vector<FullStepRow<WIDTH>>& X, const size_t hlen, cons
 }
 
 template<unsigned int N, unsigned int K>
+std::set<std::vector<eh_index>> Equihash<N,K>::RecreatePartial(const eh_HashState& base_state, const eh_index soln_size, const eh_index recreate_size, eh_trunc* partialSoln)
+{
+    std::set<std::vector<eh_index>> solns;
+    size_t hashLen;
+    size_t lenIndices;
+    std::vector<boost::optional<std::vector<FullStepRow<FinalFullWidth>>>> X;
+    X.reserve(K+1);
+
+    // 3) Repeat steps 1 and 2 for each partial index
+    for (eh_index i = 0; i < soln_size; i++) {
+        // 1) Generate first list of possibilities
+        std::vector<FullStepRow<FinalFullWidth>> icv;
+        icv.reserve(recreate_size);
+        for (eh_index j = 0; j < recreate_size; j++) {
+            eh_index newIndex { UntruncateIndex(partialSoln[i], j, CollisionBitLength + 1) };
+            icv.emplace_back(N, base_state, newIndex);
+        }
+        boost::optional<std::vector<FullStepRow<FinalFullWidth>>> ic = icv;
+
+        // 2a) For each pair of lists:
+        hashLen = N/8;
+        lenIndices = sizeof(eh_index);
+        size_t rti = i;
+        for (size_t r = 0; r <= K; r++) {
+            // 2b) Until we are at the top of a subtree:
+            if (r < X.size()) {
+                if (X[r]) {
+                    // 2c) Merge the lists
+                    ic->reserve(ic->size() + X[r]->size());
+                    ic->insert(ic->end(), X[r]->begin(), X[r]->end());
+                    std::sort(ic->begin(), ic->end(), CompareSR(hashLen));
+                    size_t lti = rti-(1<<r);
+                    CollideBranches(*ic, hashLen, lenIndices,
+                                    CollisionByteLength,
+                                    CollisionBitLength + 1,
+                                    partialSoln[lti], partialSoln[rti]);
+
+                    // 2d) Check if this has become an invalid solution
+                    if (ic->size() == 0)
+                        goto deletesolution;
+
+                    X[r] = boost::none;
+                    hashLen -= CollisionByteLength;
+                    lenIndices *= 2;
+                    rti = lti;
+                } else {
+                    X[r] = *ic;
+                    break;
+                }
+            } else {
+                X.push_back(ic);
+                break;
+            }
+        }
+    }
+
+    // We are at the top of the tree
+    assert(X.size() == K+1);
+    for (FullStepRow<FinalFullWidth> row : *X[K]) {
+        solns.insert(row.GetIndices(hashLen, lenIndices));
+    }
+
+deletesolution:
+    delete[] partialSoln;
+
+    return solns;
+}
+
+template<unsigned int N, unsigned int K>
 std::set<std::vector<eh_index>> Equihash<N,K>::OptimisedSolve(const eh_HashState& base_state)
 {
     eh_index init_size { 1 << (CollisionBitLength + 1) };
@@ -455,75 +526,40 @@ std::set<std::vector<eh_index>> Equihash<N,K>::OptimisedSolve(const eh_HashState
 
     // Now for each solution run the algorithm again to recreate the indices
     LogPrint("pow", "Culling solutions\n");
-    std::set<std::vector<eh_index>> solns;
     eh_index recreate_size { UntruncateIndex(1, 0, CollisionBitLength + 1) };
-    int invalidCount = 0;
+
+    boost::basic_thread_pool pool {2}; // TODO add config parameter
+    std::vector<boost::shared_future<std::set<std::vector<eh_index>>>> futures;
+    futures.resize(partialSolns.size());
     for (eh_trunc* partialSoln : partialSolns) {
-        size_t hashLen;
-        size_t lenIndices;
-        std::vector<boost::optional<std::vector<FullStepRow<FinalFullWidth>>>> X;
-        X.reserve(K+1);
+        futures.push_back(boost::async(pool, boost::bind(&Equihash<N, K>::RecreatePartial, this), base_state, soln_size, recreate_size, partialSoln));
+    }
 
-        // 3) Repeat steps 1 and 2 for each partial index
-        for (eh_index i = 0; i < soln_size; i++) {
-            // 1) Generate first list of possibilities
-            std::vector<FullStepRow<FinalFullWidth>> icv;
-            icv.reserve(recreate_size);
-            for (eh_index j = 0; j < recreate_size; j++) {
-                eh_index newIndex { UntruncateIndex(partialSoln[i], j, CollisionBitLength + 1) };
-                icv.emplace_back(N, base_state, newIndex);
-            }
-            boost::optional<std::vector<FullStepRow<FinalFullWidth>>> ic = icv;
-
-            // 2a) For each pair of lists:
-            hashLen = N/8;
-            lenIndices = sizeof(eh_index);
-            size_t rti = i;
-            for (size_t r = 0; r <= K; r++) {
-                // 2b) Until we are at the top of a subtree:
-                if (r < X.size()) {
-                    if (X[r]) {
-                        // 2c) Merge the lists
-                        ic->reserve(ic->size() + X[r]->size());
-                        ic->insert(ic->end(), X[r]->begin(), X[r]->end());
-                        std::sort(ic->begin(), ic->end(), CompareSR(hashLen));
-                        size_t lti = rti-(1<<r);
-                        CollideBranches(*ic, hashLen, lenIndices,
-                                        CollisionByteLength,
-                                        CollisionBitLength + 1,
-                                        partialSoln[lti], partialSoln[rti]);
-
-                        // 2d) Check if this has become an invalid solution
-                        if (ic->size() == 0)
-                            goto invalidsolution;
-
-                        X[r] = boost::none;
-                        hashLen -= CollisionByteLength;
-                        lenIndices *= 2;
-                        rti = lti;
-                    } else {
-                        X[r] = *ic;
-                        break;
+    std::set<std::vector<eh_index>> solns;
+    int invalidCount = 0;
+    while (futures.size() > 0) {
+        std::vector<boost::shared_future<std::set<std::vector<eh_index>>>>::iterator first = futures.begin();
+        std::vector<boost::shared_future<std::set<std::vector<eh_index>>>>::iterator last = futures.end();
+        std::vector<boost::shared_future<std::set<std::vector<eh_index>>>>::iterator remove = first;
+        while (first != last) {
+            if (!first->is_ready()) {
+                *remove = std::move(*first);
+                ++remove;
+            } else {
+                std::set<std::vector<eh_index>> ret = first->get();
+                if (ret.size() > 0) {
+                    for (auto soln : ret) {
+                        solns.insert(soln);
                     }
                 } else {
-                    X.push_back(ic);
-                    break;
+                    invalidCount++;
                 }
             }
+            ++first;
         }
-
-        // We are at the top of the tree
-        assert(X.size() == K+1);
-        for (FullStepRow<FinalFullWidth> row : *X[K]) {
-            solns.insert(row.GetIndices(hashLen, lenIndices));
-        }
-        goto deletesolution;
-
-invalidsolution:
-        invalidCount++;
-
-deletesolution:
-        delete[] partialSoln;
+        if (remove != last)
+            futures.erase(remove, last);
+        MilliSleep(100);
     }
     LogPrint("pow", "- Number of invalid solutions found: %d\n", invalidCount);
 

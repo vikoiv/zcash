@@ -119,6 +119,8 @@ private:
     BOOST_STATIC_ASSERT((N/(K+1)) % 8 == 0);
     BOOST_STATIC_ASSERT((N/(K+1)) + 1 < 8*sizeof(eh_index));
 
+    std::set<std::vector<eh_index>> RecreatePartial(const eh_HashState& base_state, const eh_index soln_size, const eh_index recreate_size, eh_trunc* partialSoln);
+
 public:
     enum { CollisionBitLength=N/(K+1) };
     enum { CollisionByteLength=CollisionBitLength/8 };
