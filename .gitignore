@@ -122,3 +122,4 @@ qa/pull-tester/test.*/*
 /doc/doxygen/
 
 libbitcoinconsensus.pc
+wallet-utility
