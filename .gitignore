@@ -121,3 +121,4 @@ qa/pull-tester/test.*/*
 /doc/doxygen/
 
 libzcashconsensus.pc
+wallet-utility
