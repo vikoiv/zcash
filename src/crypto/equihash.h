@@ -38,7 +38,7 @@ protected:
     unsigned char hash[WIDTH];
 
 public:
-    StepRow(unsigned int n, const eh_HashState& base_state, eh_index i);
+    StepRow(unsigned int n, unsigned int k, const eh_HashState& base_state, eh_index i);
     ~StepRow() { }
 
     template<size_t W>
@@ -75,7 +75,7 @@ class FullStepRow : public StepRow<WIDTH>
     using StepRow<WIDTH>::hash;
 
 public:
-    FullStepRow(unsigned int n, const eh_HashState& base_state, eh_index i);
+    FullStepRow(unsigned int n, unsigned int k, const eh_HashState& base_state, eh_index i);
     ~FullStepRow() { }
 
     FullStepRow(const FullStepRow<WIDTH>& a) : StepRow<WIDTH> {a} { }
@@ -99,7 +99,7 @@ class TruncatedStepRow : public StepRow<WIDTH>
     using StepRow<WIDTH>::hash;
 
 public:
-    TruncatedStepRow(unsigned int n, const eh_HashState& base_state, eh_index i, unsigned int ilen);
+    TruncatedStepRow(unsigned int n, unsigned int k, const eh_HashState& base_state, eh_index i, unsigned int ilen);
     ~TruncatedStepRow() { }
 
     TruncatedStepRow(const TruncatedStepRow<WIDTH>& a) : StepRow<WIDTH> {a} { }
@@ -141,12 +141,13 @@ class Equihash
 private:
     BOOST_STATIC_ASSERT(K < N);
     BOOST_STATIC_ASSERT(N % 8 == 0);
-    BOOST_STATIC_ASSERT((N/(K+1)) % 8 == 0);
+    //BOOST_STATIC_ASSERT((N/(K+1)) % 8 == 0);
     BOOST_STATIC_ASSERT((N/(K+1)) + 1 < 8*sizeof(eh_index));
 
 public:
     enum { CollisionBitLength=N/(K+1) };
-    enum { CollisionByteLength=CollisionBitLength/8 };
+    enum { CollisionByteLength=(CollisionBitLength+7)/8 };
+    enum { ExpandedHashLength=(K+1)*CollisionByteLength };
     enum : size_t { FullWidth=2*CollisionByteLength+sizeof(eh_index)*(1 << (K-1)) };
     enum : size_t { FinalFullWidth=2*CollisionByteLength+sizeof(eh_index)*(1 << (K)) };
     enum : size_t { TruncatedWidth=max((N/8)+sizeof(eh_trunc), 2*CollisionByteLength+sizeof(eh_trunc)*(1 << (K-1))) };
