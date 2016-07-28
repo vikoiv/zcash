@@ -210,6 +210,7 @@ std::set<std::vector<eh_index>> Equihash<N,K>::BasicSolve(const eh_HashState& ba
     eh_index init_size { 1 << (CollisionBitLength + 1) };
 
     // 1) Generate first list
+    LogPrint("pow", "N = %d, K = %d\n", N, K);
     LogPrint("pow", "Generating first list\n");
     size_t hashLen = ExpandedHashLength;
     size_t lenIndices = sizeof(eh_index);
@@ -223,6 +224,7 @@ std::set<std::vector<eh_index>> Equihash<N,K>::BasicSolve(const eh_HashState& ba
     // 3) Repeat step 2 until 2n/(k+1) bits remain
     for (int r = 1; r < K && X.size() > 0; r++) {
         LogPrint("pow", "Round %d:\n", r);
+        LogPrint("pow", "- Size %d\n", X.size());
         // 2a) Sort the list
         LogPrint("pow", "- Sorting list\n");
         std::sort(X.begin(), X.end(), CompareSR(CollisionByteLength));
@@ -281,6 +283,7 @@ std::set<std::vector<eh_index>> Equihash<N,K>::BasicSolve(const eh_HashState& ba
 
     // k+1) Find a collision on last 2n(k+1) bits
     LogPrint("pow", "Final round:\n");
+    LogPrint("pow", "- Size %d\n", X.size());
     std::set<std::vector<eh_index>> solns;
     if (X.size() > 1) {
         LogPrint("pow", "- Sorting list\n");
@@ -310,6 +313,7 @@ std::set<std::vector<eh_index>> Equihash<N,K>::BasicSolve(const eh_HashState& ba
     } else
         LogPrint("pow", "- List is empty\n");
 
+    LogPrint("pow", "- Number of solutions found: %d\n", solns.size());
     return solns;
 }
 
@@ -380,6 +384,7 @@ std::set<std::vector<eh_index>> Equihash<N,K>::OptimisedSolve(const eh_HashState
     {
 
         // 1) Generate first list
+        LogPrint("pow", "N = %d, K = %d\n", N, K);
         LogPrint("pow", "Generating first list\n");
         size_t hashLen = ExpandedHashLength;
         size_t lenIndices = sizeof(eh_trunc);
@@ -393,6 +398,7 @@ std::set<std::vector<eh_index>> Equihash<N,K>::OptimisedSolve(const eh_HashState
         // 3) Repeat step 2 until 2n/(k+1) bits remain
         for (int r = 1; r < K && Xt.size() > 0; r++) {
             LogPrint("pow", "Round %d:\n", r);
+            LogPrint("pow", "- Size %d\n", Xt.size());
             // 2a) Sort the list
             LogPrint("pow", "- Sorting list\n");
             std::sort(Xt.begin(), Xt.end(), CompareSR(CollisionByteLength));
@@ -450,6 +456,7 @@ std::set<std::vector<eh_index>> Equihash<N,K>::OptimisedSolve(const eh_HashState
 
         // k+1) Find a collision on last 2n(k+1) bits
         LogPrint("pow", "Final round:\n");
+        LogPrint("pow", "- Size %d\n", Xt.size());
         if (Xt.size() > 1) {
             LogPrint("pow", "- Sorting list\n");
             std::sort(Xt.begin(), Xt.end(), CompareSR(hashLen));
@@ -552,6 +559,7 @@ invalidsolution:
         invalidCount++;
     }
     LogPrint("pow", "- Number of invalid solutions found: %d\n", invalidCount);
+    LogPrint("pow", "- Number of solutions found: %d\n", solns.size());
 
     return solns;
 }
