@@ -15,7 +15,7 @@ function zcashd_generate {
 function zcashd_start {
     rm -rf "$DATADIR"
     mkdir -p "$DATADIR"
-    ./src/zcashd -regtest -datadir="$DATADIR" -rpcuser=user -rpcpassword=password -rpcport=5983 &
+    ./src/zcashd -regtest -debug=pow -printtoconsole -datadir="$DATADIR" -rpcuser=user -rpcpassword=password -rpcport=5983 &
     ZCASHD_PID=$!
 }
 
