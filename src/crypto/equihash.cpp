@@ -609,6 +609,30 @@ bool Equihash<N,K>::IsValidSolution(const eh_HashState& base_state, std::vector<
     return X[0].IsZero(hashLen);
 }
 
+// Explicit instantiations for Equihash<200,9>
+template int Equihash<200,9>::InitialiseState(eh_HashState& base_state);
+template std::set<std::vector<eh_index>> Equihash<200,9>::BasicSolve(const eh_HashState& base_state, const std::function<bool(EhSolverCancelCheck)> cancelled);
+template std::set<std::vector<eh_index>> Equihash<200,9>::OptimisedSolve(const eh_HashState& base_state, const std::function<bool(EhSolverCancelCheck)> cancelled);
+template bool Equihash<200,9>::IsValidSolution(const eh_HashState& base_state, std::vector<eh_index> soln);
+
+// Explicit instantiations for Equihash<216,8>
+template int Equihash<216,8>::InitialiseState(eh_HashState& base_state);
+template std::set<std::vector<eh_index>> Equihash<216,8>::BasicSolve(const eh_HashState& base_state, const std::function<bool(EhSolverCancelCheck)> cancelled);
+template std::set<std::vector<eh_index>> Equihash<216,8>::OptimisedSolve(const eh_HashState& base_state, const std::function<bool(EhSolverCancelCheck)> cancelled);
+template bool Equihash<216,8>::IsValidSolution(const eh_HashState& base_state, std::vector<eh_index> soln);
+
+// Explicit instantiations for Equihash<208,12>
+template int Equihash<208,12>::InitialiseState(eh_HashState& base_state);
+template std::set<std::vector<eh_index>> Equihash<208,12>::BasicSolve(const eh_HashState& base_state, const std::function<bool(EhSolverCancelCheck)> cancelled);
+template std::set<std::vector<eh_index>> Equihash<208,12>::OptimisedSolve(const eh_HashState& base_state, const std::function<bool(EhSolverCancelCheck)> cancelled);
+template bool Equihash<208,12>::IsValidSolution(const eh_HashState& base_state, std::vector<eh_index> soln);
+
+// Explicit instantiations for Equihash<144,5>
+template int Equihash<144,5>::InitialiseState(eh_HashState& base_state);
+template std::set<std::vector<eh_index>> Equihash<144,5>::BasicSolve(const eh_HashState& base_state, const std::function<bool(EhSolverCancelCheck)> cancelled);
+template std::set<std::vector<eh_index>> Equihash<144,5>::OptimisedSolve(const eh_HashState& base_state, const std::function<bool(EhSolverCancelCheck)> cancelled);
+template bool Equihash<144,5>::IsValidSolution(const eh_HashState& base_state, std::vector<eh_index> soln);
+
 // Explicit instantiations for Equihash<96,3>
 template int Equihash<96,3>::InitialiseState(eh_HashState& base_state);
 template std::set<std::vector<eh_index>> Equihash<96,3>::BasicSolve(const eh_HashState& base_state, const std::function<bool(EhSolverCancelCheck)> cancelled);

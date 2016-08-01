@@ -163,12 +163,24 @@ public:
 
 #include "equihash.tcc"
 
+static Equihash<200,9> Eh200_9;
+static Equihash<216,8> Eh216_8;
+static Equihash<208,12> Eh208_12;
+static Equihash<144,5> Eh144_5;
 static Equihash<96,3> Eh96_3;
 static Equihash<96,5> Eh96_5;
 static Equihash<48,5> Eh48_5;
 
 #define EhInitialiseState(n, k, base_state)  \
-    if (n == 96 && k == 3) {                 \
+    if (n == 200 && k == 9) {                \
+        Eh200_9.InitialiseState(base_state); \
+    } else if (n == 216 && k == 8) {         \
+        Eh216_8.InitialiseState(base_state); \
+    } else if (n == 208 && k == 12) {        \
+        Eh208_12.InitialiseState(base_state);\
+    } else if (n == 144 && k == 5) {         \
+        Eh144_5.InitialiseState(base_state); \
+    } else if (n == 96 && k == 3) {          \
         Eh96_3.InitialiseState(base_state);  \
     } else if (n == 96 && k == 5) {          \
         Eh96_5.InitialiseState(base_state);  \
@@ -179,7 +191,15 @@ static Equihash<48,5> Eh48_5;
     }
 
 #define EhBasicSolve(n, k, base_state, solns, cancelled)   \
-    if (n == 96 && k == 3) {                               \
+    if (n == 200 && k == 9) {                              \
+        solns = Eh200_9.BasicSolve(base_state, cancelled); \
+    } else if (n == 216 && k == 8) {                       \
+        solns = Eh216_8.BasicSolve(base_state, cancelled); \
+    } else if (n == 208 && k == 12) {                      \
+        solns = Eh208_12.BasicSolve(base_state, cancelled);\
+    } else if (n == 144 && k == 5) {                       \
+        solns = Eh144_5.BasicSolve(base_state, cancelled); \
+    } else if (n == 96 && k == 3) {                        \
         solns = Eh96_3.BasicSolve(base_state, cancelled);  \
     } else if (n == 96 && k == 5) {                        \
         solns = Eh96_5.BasicSolve(base_state, cancelled);  \
@@ -192,7 +212,15 @@ static Equihash<48,5> Eh48_5;
     EhBasicSolve(n, k, base_state, solns, [](EhSolverCancelCheck pos) { return false; })
 
 #define EhOptimisedSolve(n, k, base_state, solns, cancelled)   \
-    if (n == 96 && k == 3) {                                   \
+    if (n == 200 && k == 9) {                                  \
+        solns = Eh200_9.OptimisedSolve(base_state, cancelled); \
+    } else if (n == 216 && k == 8) {                           \
+        solns = Eh216_8.OptimisedSolve(base_state, cancelled); \
+    } else if (n == 208 && k == 12) {                          \
+        solns = Eh208_12.OptimisedSolve(base_state, cancelled);\
+    } else if (n == 144 && k == 5) {                           \
+        solns = Eh144_5.OptimisedSolve(base_state, cancelled); \
+    } else if (n == 96 && k == 3) {                            \
         solns = Eh96_3.OptimisedSolve(base_state, cancelled);  \
     } else if (n == 96 && k == 5) {                            \
         solns = Eh96_5.OptimisedSolve(base_state, cancelled);  \
@@ -205,7 +233,15 @@ static Equihash<48,5> Eh48_5;
     EhOptimisedSolve(n, k, base_state, solns, [](EhSolverCancelCheck pos) { return false; })
 
 #define EhIsValidSolution(n, k, base_state, soln, ret)   \
-    if (n == 96 && k == 3) {                             \
+    if (n == 200 && k == 9) {                            \
+        ret = Eh200_9.IsValidSolution(base_state, soln); \
+    } else if (n == 216 && k == 8) {                     \
+        ret = Eh216_8.IsValidSolution(base_state, soln); \
+    } else if (n == 208 && k == 12) {                    \
+        ret = Eh208_12.IsValidSolution(base_state, soln);\
+    } else if (n == 144 && k == 5) {                     \
+        ret = Eh144_5.IsValidSolution(base_state, soln); \
+    } else if (n == 96 && k == 3) {                      \
         ret = Eh96_3.IsValidSolution(base_state, soln);  \
     } else if (n == 96 && k == 5) {                      \
         ret = Eh96_5.IsValidSolution(base_state, soln);  \
