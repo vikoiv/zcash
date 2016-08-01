@@ -417,7 +417,13 @@ std::set<std::vector<eh_index>> Equihash<N,K>::OptimisedSolve(const eh_HashState
                 }
 
                 // 2c) Calculate tuples (X_i ^ X_j, (i, j))
+                bool checking_for_zero = (i == 0 && Xt[0].IsZero(hashLen));
                 for (int l = 0; l < j - 1; l++) {
+                    if (checking_for_zero) {
+                        auto indices = Xt[i+l].GetTruncatedIndices();
+                        bool checked_index[indices.size()] = {};
+                        for (
+
                     for (int m = l + 1; m < j; m++) {
                         // We truncated, so don't check for distinct indices here
                         Xc.emplace_back(Xt[i+l], Xt[i+m], hashLen, lenIndices, CollisionByteLength);
