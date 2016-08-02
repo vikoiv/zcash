@@ -18,6 +18,7 @@
 #include <algorithm>
 #include <iostream>
 #include <stdexcept>
+#include <sys/time.h>
 
 #include <boost/optional.hpp>
 
@@ -519,7 +520,14 @@ std::set<std::vector<eh_index>> Equihash<N,K>::OptimisedSolve(const eh_HashState
 
     // Now for each solution run the algorithm again to recreate the indices
     LogPrint("pow", "Culling solutions\n");
+    struct timeval tv_start;
+    struct timeval tv_end;
+    gettimeofday(&tv_start, 0);
     for (std::shared_ptr<eh_trunc> partialSoln : partialSolns) {
+        gettimeofday(&tv_end, 0);
+        LogPrint("pow", "Time to eliminate: %d\n", double(tv_end.tv_sec-tv_start.tv_sec) +
+        (tv_end.tv_usec-tv_start.tv_usec)/double(1000000));
+        gettimeofday(&tv_start, 0);
         size_t hashLen;
         size_t lenIndices;
         std::vector<boost::optional<std::vector<FullStepRow<FinalFullWidth>>>> X;
