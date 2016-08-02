@@ -110,8 +110,8 @@ double benchmark_solve_equihash()
     EhInitialiseState(n, k, eh_state);
     crypto_generichash_blake2b_update(&eh_state, (unsigned char*)&ss[0], ss.size());
 
-    uint256 nonce;
-    randombytes_buf(nonce.begin(), 32);
+    uint256 nonce = ArithToUint256(2);
+    //randombytes_buf(nonce.begin(), 32);
     crypto_generichash_blake2b_update(&eh_state,
                                     nonce.begin(),
                                     nonce.size());
