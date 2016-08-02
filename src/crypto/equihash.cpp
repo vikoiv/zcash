@@ -324,8 +324,10 @@ bool IsProbablyDuplicate(std::shared_ptr<eh_trunc> indices, size_t lenIndices)
         if (!checked_index[z]) {
             for (int y = z+1; y < lenIndices; y++) {
                 if (!checked_index[y] && indices.get()[z] == indices.get()[y]) {
+                    // Pair found
                     checked_index[y] = true;
                     checked_index[z] = true;
+                    break;
                 }
             }
         }
@@ -439,17 +441,16 @@ std::set<std::vector<eh_index>> Equihash<N,K>::OptimisedSolve(const eh_HashState
                 // 2c) Calculate tuples (X_i ^ X_j, (i, j))
                 bool checking_for_zero = (i == 0 && Xt[0].IsZero(hashLen));
                 for (int l = 0; l < j - 1; l++) {
-                    if (checking_for_zero && IsProbablyDuplicate(Xt[i+l].GetTruncatedIndices(hashLen, lenIndices), lenIndices)) {
-                        break;
-                    }
-
                     for (int m = l + 1; m < j; m++) {
-                        if (checking_for_zero && IsProbablyDuplicate(Xt[i+m].GetTruncatedIndices(hashLen, lenIndices), lenIndices)) {
-                            break;
-                        }
-
                         // We truncated, so don't check for distinct indices here
-                        Xc.emplace_back(Xt[i+l], Xt[i+m], hashLen, lenIndices, CollisionByteLength);
+                        TruncatedStepRow<TruncatedWidth> Xi {Xt[i+l], Xt[i+m],
+                                                             hashLen, lenIndices,
+                                                             CollisionByteLength};
+                        if (!(Xi.IsZero(hashLen-CollisionByteLength) &&
+                              IsProbablyDuplicate(Xi.GetTruncatedIndices(hashLen-CollisionByteLength, 2*lenIndices),
+                                                  2*lenIndices))) {
+                            Xc.emplace_back(Xi);
+                        }
                     }
                 }
 
