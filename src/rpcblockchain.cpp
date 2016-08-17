@@ -234,7 +234,6 @@ Value getrawmempool(const Array& params, bool fHelp)
     }
 }
 
-
 Value getblockhashes(const Array& params, bool fHelp)
 {
     if (fHelp || params.size() < 2)
