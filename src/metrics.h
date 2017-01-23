@@ -38,6 +38,11 @@ extern AtomicCounter failedSolutions;
 void TrackMinedBlock(uint256 hash);
 #endif
 
+void MarkStartTime();
+double GetLocalSolPS();
+
+void TriggerRefresh();
+
 void ConnectMetricsScreen();
 void ThreadShowMetricsScreen();
 

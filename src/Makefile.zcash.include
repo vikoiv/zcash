@@ -1,15 +1,8 @@
 bin_PROGRAMS += \
-  zcash/GenerateParams \
   zcash-miner
-
-# tool for generating our public parameters
-zcash_GenerateParams_SOURCES = zcash/GenerateParams.cpp
-zcash_GenerateParams_LDADD = \
-  $(BOOST_LIBS) \
-  $(LIBZCASH) \
-  $(LIBBITCOIN_UTIL) \
-  $(LIBBITCOIN_CRYPTO) \
-  $(LIBZCASH_LIBS)
+noinst_PROGRAMS += \
+  zcash/GenerateParams \
+  zcash/CreateJoinSplit
 
 zcash_miner_SOURCES = \
   libstratum/StratumClient.cpp \
@@ -28,4 +21,23 @@ zcash_miner_LDADD = \
   $(BOOST_LIBS) \
   $(CRYPTO_LIBS) \
   $(LIBZCASH) \
+  $(LIBZCASH_LIBS)
+
+# tool for generating our public parameters
+zcash_GenerateParams_SOURCES = zcash/GenerateParams.cpp
+zcash_GenerateParams_LDADD = \
+  $(BOOST_LIBS) \
+  $(LIBZCASH) \
+  $(LIBBITCOIN_UTIL) \
+  $(LIBBITCOIN_CRYPTO) \
+  $(LIBZCASH_LIBS)
+
+# tool for profiling the creation of joinsplits
+zcash_CreateJoinSplit_SOURCES = zcash/CreateJoinSplit.cpp
+zcash_CreateJoinSplit_LDADD = \
+  $(LIBBITCOIN_COMMON) \
+  $(LIBBITCOIN_UTIL) \
+  $(LIBBITCOIN_CRYPTO) \
+  $(LIBZCASH) \
+  $(BOOST_LIBS) \
   $(LIBZCASH_LIBS)
