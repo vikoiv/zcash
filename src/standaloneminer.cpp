@@ -68,11 +68,11 @@ std::string HelpMessageMiner()
     return strUsage;
 }
 
-std::string LicenseInfo()
+std::string MinerLicenseInfo()
 {
     return FormatParagraph(_("Copyright (C) 2009-2015 The Bitcoin Core Developers")) + "\n" +
            FormatParagraph(strprintf(_("Copyright (C) 2015-%i The Zcash Developers"), COPYRIGHT_YEAR)) + "\n" +
-           FormatParagraph(strprintf(_("Copyright (C) %i Jack Grigg <jack@z.cash>"), COPYRIGHT_YEAR)) + "\n" +
+           FormatParagraph(strprintf(_("Copyright (C) 2016-%i Jack Grigg <jack@z.cash>"), COPYRIGHT_YEAR)) + "\n" +
            "\n" +
            FormatParagraph(_("This is experimental software.")) + "\n" +
            "\n" +
@@ -178,7 +178,7 @@ int main(int argc, char* argv[])
                                _("version") + " " + FormatFullVersion() + "\n";
 
         if (mapArgs.count("-version")) {
-            strUsage += LicenseInfo();
+            strUsage += MinerLicenseInfo();
         } else {
             strUsage += "\n" + _("Usage:") + "\n" +
                   "  zcash-miner [options]                     " + _("Start Zcash Miner") + "\n";
