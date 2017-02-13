@@ -143,6 +143,7 @@ int printNetworkStats()
 
 int printMiningStatus(bool mining)
 {
+#ifdef ENABLE_MINING
     // Number of lines that are always displayed
     int lines = 1;
 
@@ -166,6 +167,9 @@ int printMiningStatus(bool mining)
     std::cout << std::endl;
 
     return lines;
+#else // ENABLE_MINING
+    return 0;
+#endif // !ENABLE_MINING
 }
 
 int printMetrics(size_t cols, bool mining)
@@ -381,7 +385,11 @@ void ThreadShowMetricsScreen()
 #ifdef STANDALONE_MINER
         bool mining = true;
 #else
+#ifdef ENABLE_MINING
         bool mining = GetBoolArg("-gen", false);
+#else
+        bool mining = false;
+#endif
 
         if (loaded) {
             lines += printNetworkStats();
