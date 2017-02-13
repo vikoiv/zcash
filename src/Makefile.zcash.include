@@ -1,8 +1,10 @@
-bin_PROGRAMS += \
-  zcash-miner
 noinst_PROGRAMS += \
   zcash/GenerateParams \
   zcash/CreateJoinSplit
+
+if ENABLE_MINING
+bin_PROGRAMS += \
+  zcash-miner
 
 zcash_miner_SOURCES = \
   libstratum/StratumClient.cpp \
@@ -22,6 +24,7 @@ zcash_miner_LDADD = \
   $(CRYPTO_LIBS) \
   $(LIBZCASH) \
   $(LIBZCASH_LIBS)
+endif
 
 # tool for generating our public parameters
 zcash_GenerateParams_SOURCES = zcash/GenerateParams.cpp
