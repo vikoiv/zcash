@@ -12,12 +12,11 @@
 #include <boost/bind.hpp>
 #include <thread>
 
-#include "json/json_spirit_value.h"
+#include <univalue.h>
 
 using namespace std;
 using namespace boost::asio;
 using boost::asio::ip::tcp;
-using namespace json_spirit;
 
 
 typedef struct {
@@ -55,7 +54,7 @@ private:
 
     void work_timeout_handler(const boost::system::error_code& ec);
 
-    void processReponse(const Object& responseObject);
+    void processReponse(const UniValue& responseObject);
 
     cred_t * p_active;
     cred_t m_primary;

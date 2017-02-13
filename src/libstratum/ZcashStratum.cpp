@@ -316,7 +316,7 @@ void ZcashMiner::stop()
     }
 }
 
-void ZcashMiner::setServerNonce(const Array& params)
+void ZcashMiner::setServerNonce(const UniValue& params)
 {
     auto n1str = params[1].get_str();
     std::vector<unsigned char> nonceData(ParseHex(n1str));
@@ -338,7 +338,7 @@ void ZcashMiner::setServerNonce(const Array& params)
     nonce2Inc <<= nonce1Bits;
 }
 
-ZcashJob* ZcashMiner::parseJob(const Array& params)
+ZcashJob* ZcashMiner::parseJob(const UniValue& params)
 {
     if (params.size() < 2) {
         throw std::logic_error("Invalid job params");

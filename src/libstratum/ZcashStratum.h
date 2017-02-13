@@ -11,9 +11,7 @@
 #include <boost/thread.hpp>
 #include <mutex>
 
-#include "json/json_spirit_value.h"
-
-using namespace json_spirit;
+#include <univalue.h>
 
 
 struct EquihashSolution
@@ -85,8 +83,8 @@ public:
     void start();
     void stop();
     bool isMining() { return minerThreads; }
-    void setServerNonce(const Array& params);
-    ZcashJob* parseJob(const Array& params);
+    void setServerNonce(const UniValue& params);
+    ZcashJob* parseJob(const UniValue& params);
     void setJob(ZcashJob* job);
     void onSolutionFound(const std::function<bool(const EquihashSolution&)> callback);
     void submitSolution(const EquihashSolution& solution);

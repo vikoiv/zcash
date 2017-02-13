@@ -6,11 +6,7 @@
 #include "StratumClient.h"
 #include "util.h"
 
-#include "json/json_spirit_reader_template.h"
-#include "json/json_spirit_utils.h"
-
 using boost::asio::ip::tcp;
-using namespace json_spirit;
 
 #define LogS(...) LogPrint("stratum", __VA_ARGS__)
 
@@ -85,9 +81,9 @@ void StratumClient<Miner, Job, Solution>::workLoop()
             getline(is, response);
 
             if (!response.empty() && response.front() == '{' && response.back() == '}') {
-                Value valResponse;
-                if (read_string(response, valResponse) && valResponse.type() == obj_type) {
-                    const Object& responseObject = valResponse.get_obj();
+                UniValue valResponse;
+                if (valResponse.read(response) && valResponse.isObject()) {
+                    const UniValue& responseObject = valResponse.get_obj();
                     if (!responseObject.empty()) {
                         processReponse(responseObject);
                         m_response = response;
@@ -197,13 +193,13 @@ void StratumClient<Miner, Job, Solution>::disconnect()
 }
 
 template <typename Miner, typename Job, typename Solution>
-void StratumClient<Miner, Job, Solution>::processReponse(const Object& responseObject)
+void StratumClient<Miner, Job, Solution>::processReponse(const UniValue& responseObject)
 {
-    const Value& valError = find_value(responseObject, "error");
-    if (valError.type() == array_type) {
-        const Array& error = valError.get_array();
+    const UniValue& valError = find_value(responseObject, "error");
+    if (valError.isArray()) {
+        const UniValue& error = valError.get_array();
         string msg;
-        if (error.size() > 0 && error[1].type() == str_type) {
+        if (error.size() > 0 && error[1].isStr()) {
             msg = error[1].get_str();
         } else {
             msg = "Unknown error";
@@ -211,19 +207,19 @@ void StratumClient<Miner, Job, Solution>::processReponse(const Object& responseO
         LogS("%s\n", msg);
     }
     std::ostream os(&m_requestBuffer);
-    const Value& valId = find_value(responseObject, "id");
+    const UniValue& valId = find_value(responseObject, "id");
     int id = 0;
-    if (valId.type() == int_type) {
+    if (valId.isNum()) {
         id = valId.get_int();
     }
-    Value valRes;
+    UniValue valRes;
     bool accepted = false;
     switch (id) {
     case 1:
         valRes = find_value(responseObject, "result");
-        if (valRes.type() == array_type) {
+        if (valRes.isArray()) {
             LogS("Subscribed to stratum server\n");
-            const Array& result = valRes.get_array();
+            const UniValue& result = valRes.get_array();
             // Ignore session ID for now.
             p_miner->setServerNonce(result);
             os << "{\"id\": 2, \"method\": \"mining.authorize\", \"params\": [\""
@@ -234,7 +230,7 @@ void StratumClient<Miner, Job, Solution>::processReponse(const Object& responseO
     case 2:
         valRes = find_value(responseObject, "result");
         m_authorized = false;
-        if (valRes.type() == bool_type) {
+        if (valRes.isBool()) {
             m_authorized = valRes.get_bool();
         }
         if (!m_authorized) {
@@ -249,7 +245,7 @@ void StratumClient<Miner, Job, Solution>::processReponse(const Object& responseO
         break;
     case 4:
         valRes = find_value(responseObject, "result");
-        if (valRes.type() == bool_type) {
+        if (valRes.isBool()) {
             accepted = valRes.get_bool();
         }
         if (accepted) {
@@ -261,16 +257,16 @@ void StratumClient<Miner, Job, Solution>::processReponse(const Object& responseO
         }
         break;
     default:
-        const Value& valMethod = find_value(responseObject, "method");
+        const UniValue& valMethod = find_value(responseObject, "method");
         string method = "";
-        if (valMethod.type() == str_type) {
+        if (valMethod.isStr()) {
             method = valMethod.get_str();
         }
 
         if (method == "mining.notify") {
-            const Value& valParams = find_value(responseObject, "params");
-            if (valParams.type() == array_type) {
-                const Array& params = valParams.get_array();
+            const UniValue& valParams = find_value(responseObject, "params");
+            if (valParams.isArray()) {
+                const UniValue& params = valParams.get_array();
                 Job* workOrder = p_miner->parseJob(params);
 
                 if (workOrder) {
@@ -296,16 +292,16 @@ void StratumClient<Miner, Job, Solution>::processReponse(const Object& responseO
                 }
             }
         } else if (method == "mining.set_target") {
-            const Value& valParams = find_value(responseObject, "params");
-            if (valParams.type() == array_type) {
-                const Array& params = valParams.get_array();
+            const UniValue& valParams = find_value(responseObject, "params");
+            if (valParams.isArray()) {
+                const UniValue& params = valParams.get_array();
                 m_nextJobTarget = params[0].get_str();
                 LogS("Target set to %s\n", m_nextJobTarget);
             }
         } else if (method == "client.reconnect") {
-            const Value& valParams = find_value(responseObject, "params");
-            if (valParams.type() == array_type) {
-                const Array& params = valParams.get_array();
+            const UniValue& valParams = find_value(responseObject, "params");
+            if (valParams.isArray()) {
+                const UniValue& params = valParams.get_array();
                 if (params.size() > 0) {
                     p_active->host = params[0].get_str();
                     p_active->port = params[1].get_str();
