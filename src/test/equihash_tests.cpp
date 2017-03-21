@@ -21,6 +21,10 @@
 
 #include <boost/test/unit_test.hpp>
 
+#ifdef ENABLE_RUST
+#include "librustzcash.h"
+#endif // ENABLE_RUST
+
 BOOST_FIXTURE_TEST_SUITE(equihash_tests, BasicTestingSetup)
 
 void PrintSolution(std::stringstream &strm, std::vector<uint32_t> soln) {
@@ -99,6 +103,13 @@ void TestEquihashValidator(unsigned int n, unsigned int k, const std::string &I,
     bool isValid;
     EhIsValidSolution(n, k, state, GetMinimalFromIndices(soln, cBitLen), isValid);
     BOOST_CHECK(isValid == expected);
+    #ifdef ENABLE_RUST
+    isValid = librustzcash_eh_isvalid(n, k,
+                                      (unsigned char*)&I[0], I.size(),
+                                      V.begin(), V.size(),
+                                      soln.data(), soln.size());
+    BOOST_CHECK(isValid == expected);
+    #endif // ENABLE_RUST
 }
 
 #ifdef ENABLE_MINING

@@ -759,10 +759,10 @@ AC_CHECK_LIB([snark],[main],LIBSNARK_LIBS=-lsnark, [AC_MSG_ERROR(libsnark missin
 
 RUST_LIBS=""
 if test x$enable_rust != xno; then
-  RUST_LIBS="-lrustzcash"
+  RUST_LIBS="-lrustzcash -ldl"
 fi
 
-LIBZCASH_LIBS="-lsnark -lgmp -lgmpxx -lboost_system-mt -lcrypto -lsodium -fopenmp $RUST_LIBS"
+LIBZCASH_LIBS="$RUST_LIBS -lsnark -lgmp -lgmpxx -lboost_system-mt -lcrypto -lsodium -fopenmp"
 
 CXXFLAGS_TEMP="$CXXFLAGS"
 LIBS_TEMP="$LIBS"
