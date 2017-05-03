@@ -18,6 +18,7 @@ EXTRA_DIST += \
 	test/data/txcreatesign.hex
 
 JSON_TEST_FILES = \
+  test/data/block_107401_inputs.json \
   test/data/script_valid.json \
   test/data/base58_keys_valid.json \
   test/data/base58_encode_decode.json \
