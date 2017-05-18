@@ -655,6 +655,21 @@ void ThreadImport(std::vector<boost::filesystem::path> vImportFiles)
     }
 }
 
+bool InitExperimentalMode()
+{
+    fExperimentalMode = GetBoolArg("-experimentalfeatures", false);
+
+    // Fail if user has set experimental options without the global flag
+    if (!fExperimentalMode) {
+        if (mapArgs.count("-developerencryptwallet")) {
+            return InitError(_("Wallet encryption requires -experimentalfeatures."));
+        } else if (mapArgs.count("-paymentdisclosure")) {
+            return InitError(_("Payment disclosure requires -experimentalfeatures."));
+        }
+    }
+    return true;
+}
+
 /** Sanity checks
  *  Ensure that Bitcoin is running in a usable environment with all
  *  necessary library support.
@@ -851,16 +866,8 @@ bool AppInit2(boost::thread_group& threadGroup, CScheduler& scheduler)
     const CChainParams& chainparams = Params();
 
     // Set this early so that experimental features are correctly enabled/disabled
-    fExperimentalMode = GetBoolArg("-experimentalfeatures", false);
-
-    // Fail early if user has set experimental options without the global flag
-    if (!fExperimentalMode) {
-        if (mapArgs.count("-developerencryptwallet")) {
-            return InitError(_("Wallet encryption requires -experimentalfeatures."));
-        }
-        else if (mapArgs.count("-paymentdisclosure")) {
-            return InitError(_("Payment disclosure requires -experimentalfeatures."));
-        }
+    if (!InitExperimentalMode()) {
+        return false;
     }
 
 
