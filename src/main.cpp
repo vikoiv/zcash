@@ -2631,6 +2631,26 @@ static bool ActivateBestChainStep(CValidationState &state, CBlockIndex *pindexMo
     const CBlockIndex *pindexOldTip = chainActive.Tip();
     const CBlockIndex *pindexFork = chainActive.FindFork(pindexMostWork);
 
+    auto reorgLength = pindexOldTip->nHeight - pindexFork->nHeight;
+    if (reorgLength > MAX_REORG_LENGTH) {
+        auto msg = strprintf(_(
+            "A block chain reorganization has been detected that would roll back %d blocks! "
+            "This is larger than the maximum of %d blocks, and so the node is shutting down for your safety."
+            ), reorgLength, MAX_REORG_LENGTH) + "\n\n" +
+            _("Fork details") + ":\n" +
+            "- " + strprintf(_("Current tip: %s, height %d, work %s"),
+                pindexOldTip->phashBlock->GetHex(), pindexOldTip->nHeight, pindexOldTip->nChainWork.GetHex()) + "\n" +
+            "- " + strprintf(_("New tip:     %s, height %d, work %s"),
+                pindexMostWork->phashBlock->GetHex(), pindexMostWork->nHeight, pindexMostWork->nChainWork.GetHex()) + "\n" +
+            "- " + strprintf(_("Fork point:  %s, height %d"),
+                pindexFork->phashBlock->GetHex(), pindexFork->nHeight) + "\n\n" +
+            _("Please help, human!");
+        LogPrintf("*** %s\n", msg);
+        uiInterface.ThreadSafeMessageBox(msg, "", CClientUIInterface::MSG_ERROR);
+        StartShutdown();
+        return false;
+    }
+
     // Disconnect active blocks which are no longer in the best chain.
     while (chainActive.Tip() && chainActive.Tip() != pindexFork) {
         if (!DisconnectTip(state))
