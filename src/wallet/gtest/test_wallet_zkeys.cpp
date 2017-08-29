@@ -103,8 +103,12 @@ TEST(wallet_zkeys_tests, write_zkey_direct_to_db) {
     auto addr = sk.address();
     int64_t now = GetTime();
     CKeyMetadata meta(now);
+#ifdef WALLET_DBWRAPPER
+    wallet.pwalletdbMain->WriteZKey(addr, sk, meta);
+#else
     CWalletDB db("wallet.dat");
     db.WriteZKey(addr, sk, meta);
+#endif
 
     // wallet should not be aware of key
     ASSERT_FALSE(wallet.HaveSpendingKey(addr));

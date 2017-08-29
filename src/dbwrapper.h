@@ -12,7 +12,11 @@
 #include "utilstrencodings.h"
 #include "version.h"
 
+#include <map>
+#include <thread>
+
 #include <boost/filesystem/path.hpp>
+#include <boost/thread.hpp>
 
 #include <leveldb/db.h>
 #include <leveldb/write_batch.h>
@@ -126,6 +130,17 @@ public:
         return true;
     }
 
+    bool GetKey(CDataStream& key) {
+        leveldb::Slice slKey = piter->key();
+        try {
+            CDataStream ssKey(slKey.data(), slKey.data() + slKey.size(), SER_DISK, CLIENT_VERSION);
+            key << ssKey;
+        } catch(std::exception &e) {
+            return false;
+        }
+        return true;
+    }
+
     unsigned int GetKeySize() {
         return piter->key().size();
     }
@@ -136,6 +151,18 @@ public:
             CDataStream ssValue(slValue.data(), slValue.data() + slValue.size(), SER_DISK, CLIENT_VERSION);
             ssValue.Xor(dbwrapper_private::GetObfuscateKey(parent));
             ssValue >> value;
+        } catch(std::exception &e) {
+            return false;
+        }
+        return true;
+    }
+
+    bool GetValue(CDataStream& value) {
+        leveldb::Slice slValue = piter->value();
+        try {
+            CDataStream ssValue(slValue.data(), slValue.data() + slValue.size(), SER_DISK, CLIENT_VERSION);
+            ssValue.Xor(dbwrapper_private::GetObfuscateKey(parent));
+            value << ssValue;
         } catch(std::exception &e) {
             return false;
         }
@@ -184,6 +211,10 @@ private:
 
     std::vector<unsigned char> CreateObfuscateKey() const;
 
+    //! the map of active database transactions
+    std::map<std::thread::id, CDBBatch*> activeTxns;
+    boost::shared_mutex cs_activeTxns;
+
 public:
     /**
      * @param[in] path        Location in the filesystem where leveldb data will be stored.
@@ -225,6 +256,15 @@ public:
     template <typename K, typename V>
     bool Write(const K& key, const V& value, bool fSync = false)
     {
+        {
+            // TODO: During wallet encryption, we *want* all changes to use the same transaction
+            boost::shared_lock<boost::shared_mutex> lock(cs_activeTxns);
+            auto it = activeTxns.find(std::this_thread::get_id());
+            if (it != activeTxns.end()) {
+                it->second->Write(key, value);
+                return true;
+            }
+        }
         CDBBatch batch(*this);
         batch.Write(key, value);
         return WriteBatch(batch, fSync);
@@ -252,6 +292,15 @@ public:
     template <typename K>
     bool Erase(const K& key, bool fSync = false)
     {
+        {
+            // TODO: During wallet encryption, we *want* all changes to use the same transaction
+            boost::shared_lock<boost::shared_mutex> lock(cs_activeTxns);
+            auto it = activeTxns.find(std::this_thread::get_id());
+            if (it != activeTxns.end()) {
+                it->second->Erase(key);
+                return true;
+            }
+        }
         CDBBatch batch(*this);
         batch.Erase(key);
         return WriteBatch(batch, fSync);
@@ -280,6 +329,50 @@ public:
      * Return true if the database managed by this class contains no entries.
      */
     bool IsEmpty();
+
+    bool TxnBegin()
+    {
+        boost::unique_lock<boost::shared_mutex> lock(cs_activeTxns);
+        auto id = std::this_thread::get_id();
+        if (activeTxns.find(id) != activeTxns.end())
+            return false;
+        activeTxns.emplace(id, new CDBBatch(*this));
+        return true;
+    }
+
+    bool TxnCommit(bool fSync = false)
+    {
+        boost::unique_lock<boost::shared_mutex> lock(cs_activeTxns);
+        auto id = std::this_thread::get_id();
+        if (activeTxns.find(id) == activeTxns.end())
+            return false;
+        bool ret = WriteBatch(*activeTxns[id], fSync);
+        delete activeTxns[id];
+        activeTxns.erase(id);
+        return ret;
+    }
+
+    bool TxnAbort()
+    {
+        boost::unique_lock<boost::shared_mutex> lock(cs_activeTxns);
+        auto id = std::this_thread::get_id();
+        if (activeTxns.find(id) == activeTxns.end())
+            return false;
+        delete activeTxns[id];
+        activeTxns.erase(id);
+        return true;
+    }
+
+    bool ReadVersion(int& nVersion)
+    {
+        nVersion = 0;
+        return Read(std::string("version"), nVersion);
+    }
+
+    bool WriteVersion(int nVersion)
+    {
+        return Write(std::string("version"), nVersion);
+    }
 };
 
 #endif // BITCOIN_DBWRAPPER_H

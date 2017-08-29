@@ -25,6 +25,10 @@ using namespace std;
 
 static uint64_t nAccountingEntryNumber = 0;
 
+#ifdef WALLET_DBWRAPPER
+unsigned int nWalletDBUpdated;
+#endif
+
 //
 // CWalletDB
 //
@@ -248,6 +252,25 @@ void CWalletDB::ListAccountCreditDebit(const string& strAccount, list<CAccountin
 {
     bool fAllAccounts = (strAccount == "*");
 
+#ifdef WALLET_DBWRAPPER
+    boost::scoped_ptr<CDBIterator> pcursor(NewIterator());
+    pcursor->Seek(std::make_pair(std::string("acentry"), std::make_pair((fAllAccounts ? string("") : strAccount), uint64_t(0))));
+    while (pcursor->Valid()) {
+        std::pair<std::string, std::pair<std::string, uint64_t>> key;
+        if (pcursor->GetKey(key) && key.first == "acentry" && (fAllAccounts || key.second.first == strAccount)) {
+            CAccountingEntry acentry;
+            if (pcursor->GetValue(acentry)) {
+                acentry.nEntryNo = key.second.second;
+                entries.push_back(acentry);
+                pcursor->Next();
+            } else {
+                throw runtime_error("CWalletDB::ListAccountCreditDebit(): error scanning DB");
+            }
+        } else {
+            break;
+        }
+    }
+#else
     Dbc* pcursor = GetCursor();
     if (!pcursor)
         throw runtime_error("CWalletDB::ListAccountCreditDebit(): cannot create DB cursor");
@@ -285,6 +308,7 @@ void CWalletDB::ListAccountCreditDebit(const string& strAccount, list<CAccountin
     }
 
     pcursor->close();
+#endif
 }
 
 DBErrors CWalletDB::ReorderTransactions(CWallet* pwallet)
@@ -714,6 +738,11 @@ DBErrors CWalletDB::LoadWallet(CWallet* pwallet)
             pwallet->LoadMinVersion(nMinVersion);
         }
 
+#ifdef WALLET_DBWRAPPER
+        boost::scoped_ptr<CDBIterator> pcursor(NewIterator());
+        pcursor->SeekToFirst();
+        while (pcursor->Valid()) {
+#else
         // Get cursor
         Dbc* pcursor = GetCursor();
         if (!pcursor)
@@ -724,9 +753,14 @@ DBErrors CWalletDB::LoadWallet(CWallet* pwallet)
 
         while (true)
         {
+#endif
             // Read next record
             CDataStream ssKey(SER_DISK, CLIENT_VERSION);
             CDataStream ssValue(SER_DISK, CLIENT_VERSION);
+#ifdef WALLET_DBWRAPPER
+            if (pcursor->GetKey(ssKey)) {
+                if (pcursor->GetValue(ssValue)) {
+#else
             int ret = ReadAtCursor(pcursor, ssKey, ssValue);
             if (ret == DB_NOTFOUND)
                 break;
@@ -735,6 +769,7 @@ DBErrors CWalletDB::LoadWallet(CWallet* pwallet)
                 LogPrintf("Error reading next record from wallet database\n");
                 return DB_CORRUPT;
             }
+#endif
 
             // Try to be tolerant of single corrupt records:
             string strType, strErr;
@@ -755,8 +790,21 @@ DBErrors CWalletDB::LoadWallet(CWallet* pwallet)
             }
             if (!strErr.empty())
                 LogPrintf("%s\n", strErr);
+#ifdef WALLET_DBWRAPPER
+                    pcursor->Next();
+                } else {
+                    LogPrintf("Error reading next record from wallet database\n");
+                    return DB_CORRUPT;
+                }
+            } else {
+                LogPrintf("Error reading next record from wallet database\n");
+                return DB_CORRUPT;
+            }
+#endif
         }
+#ifndef WALLET_DBWRAPPER
         pcursor->close();
+#endif
     }
     catch (const boost::thread_interrupted&) {
         throw;
@@ -817,6 +865,26 @@ DBErrors CWalletDB::FindWalletTx(CWallet* pwallet, vector<uint256>& vTxHash, vec
             pwallet->LoadMinVersion(nMinVersion);
         }
 
+#ifdef WALLET_DBWRAPPER
+        boost::scoped_ptr<CDBIterator> pcursor(NewIterator());
+        pcursor->Seek(std::make_pair(std::string("tx"), uint256()));
+        while (pcursor->Valid()) {
+            std::pair<std::string, uint256> key;
+            if (pcursor->GetKey(key) && key.first == "tx") {
+                CWalletTx wtx;
+                if (pcursor->GetValue(wtx)) {
+                    vTxHash.push_back(key.second);
+                    vWtx.push_back(wtx);
+                    pcursor->Next();
+                } else {
+                    LogPrintf("Error reading next record from wallet database\n");
+                    return DB_CORRUPT;
+                }
+            } else {
+                break;
+            }
+        }
+#else
         // Get cursor
         Dbc* pcursor = GetCursor();
         if (!pcursor)
@@ -853,6 +921,7 @@ DBErrors CWalletDB::FindWalletTx(CWallet* pwallet, vector<uint256>& vTxHash, vec
             }
         }
         pcursor->close();
+#endif
     }
     catch (const boost::thread_interrupted&) {
         throw;
@@ -886,6 +955,7 @@ DBErrors CWalletDB::ZapWalletTx(CWallet* pwallet, vector<CWalletTx>& vWtx)
 
 void ThreadFlushWalletDB(const string& strFile)
 {
+#ifndef WALLET_DBWRAPPER
     // Make this thread recognisable as the wallet flushing thread
     RenameThread("zcash-wallet");
 
@@ -944,12 +1014,16 @@ void ThreadFlushWalletDB(const string& strFile)
             }
         }
     }
+#endif
 }
 
 bool BackupWallet(const CWallet& wallet, const string& strDest)
 {
     if (!wallet.fFileBacked)
         return false;
+#ifdef WALLET_DBWRAPPER
+    // TODO: Implement wallet backup for LevelDB / dbwrapper
+#else
     while (true)
     {
         {
@@ -983,12 +1057,16 @@ bool BackupWallet(const CWallet& wallet, const string& strDest)
         }
         MilliSleep(100);
     }
+#endif
     return false;
 }
 
 //
 // Try to (very carefully!) recover wallet.dat if there is a problem.
 //
+#ifdef WALLET_DBWRAPPER
+// TODO: Recovery process for LevelDB / dbwrapper
+#else
 bool CWalletDB::Recover(CDBEnv& dbenv, const std::string& filename, bool fOnlyKeys)
 {
     // Recovery procedure:
@@ -1069,6 +1147,7 @@ bool CWalletDB::Recover(CDBEnv& dbenv, const std::string& filename)
 {
     return CWalletDB::Recover(dbenv, filename, false);
 }
+#endif
 
 bool CWalletDB::WriteDestData(const std::string &address, const std::string &key, const std::string &value)
 {

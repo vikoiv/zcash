@@ -7,7 +7,11 @@
 #define BITCOIN_WALLET_WALLETDB_H
 
 #include "amount.h"
+#ifdef WALLET_DBWRAPPER
+#include "dbwrapper.h"
+#else
 #include "wallet/db.h"
+#endif
 #include "key.h"
 #include "keystore.h"
 #include "zcash/Address.hpp"
@@ -28,6 +32,13 @@ class CWallet;
 class CWalletTx;
 class uint160;
 class uint256;
+
+#ifdef WALLET_DBWRAPPER
+#define WALLET_DB_BACKEND CDBWrapper
+extern unsigned int nWalletDBUpdated;
+#else
+#define WALLET_DB_BACKEND CDB
+#endif
 
 /** Error statuses for the wallet database */
 enum DBErrors
@@ -74,10 +85,14 @@ public:
 };
 
 /** Access to the wallet database (wallet.dat) */
-class CWalletDB : public CDB
+class CWalletDB : public WALLET_DB_BACKEND
 {
 public:
+#ifdef WALLET_DBWRAPPER
+    CWalletDB(size_t nCacheSize) : CDBWrapper(GetDataDir() / "wallet", nCacheSize)
+#else
     CWalletDB(const std::string& strFilename, const char* pszMode = "r+", bool fFlushOnClose = true) : CDB(strFilename, pszMode, fFlushOnClose)
+#endif
     {
     }
 
@@ -130,8 +145,10 @@ public:
     DBErrors LoadWallet(CWallet* pwallet);
     DBErrors FindWalletTx(CWallet* pwallet, std::vector<uint256>& vTxHash, std::vector<CWalletTx>& vWtx);
     DBErrors ZapWalletTx(CWallet* pwallet, std::vector<CWalletTx>& vWtx);
+#ifndef WALLET_DBWRAPPER
     static bool Recover(CDBEnv& dbenv, const std::string& filename, bool fOnlyKeys);
     static bool Recover(CDBEnv& dbenv, const std::string& filename);
+#endif
 
     /// Write spending key to wallet database, where key is payment address and value is spending key.
     bool WriteZKey(const libzcash::PaymentAddress& addr, const libzcash::SpendingKey& key, const CKeyMetadata &keyMeta);

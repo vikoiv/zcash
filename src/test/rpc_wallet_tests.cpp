@@ -98,11 +98,17 @@ BOOST_AUTO_TEST_CASE(rpc_wallet)
     string strAccount = "";
     string strPurpose = "receive";
     BOOST_CHECK_NO_THROW({ /*Initialize Wallet with an account */
+#ifndef WALLET_DBWRAPPER
         CWalletDB walletdb(pwalletMain->strWalletFile);
+#endif
         CAccount account;
         account.vchPubKey = demoPubkey;
         pwalletMain->SetAddressBook(account.vchPubKey.GetID(), strAccount, strPurpose);
+#ifdef WALLET_DBWRAPPER
+        pwalletMain->pwalletdbMain->WriteAccount(strAccount, account);
+#else
         walletdb.WriteAccount(strAccount, account);
+#endif
     });
 
     CPubKey setaccountDemoPubkey = pwalletMain->GenerateNewKey();

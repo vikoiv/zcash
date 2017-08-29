@@ -32,7 +32,9 @@ GetResults(CWalletDB& walletdb, std::map<CAmount, CAccountingEntry>& results)
 
 BOOST_AUTO_TEST_CASE(acc_orderupgrade)
 {
+#ifndef WALLET_DBWRAPPER
     CWalletDB walletdb(pwalletMain->strWalletFile);
+#endif
     std::vector<CWalletTx*> vpwtx;
     CWalletTx wtx;
     CAccountingEntry ae;
@@ -45,19 +47,33 @@ BOOST_AUTO_TEST_CASE(acc_orderupgrade)
     ae.nTime = 1333333333;
     ae.strOtherAccount = "b";
     ae.strComment = "";
+#ifdef WALLET_DBWRAPPER
+    pwalletMain->pwalletdbMain->WriteAccountingEntry(ae);
+#else
     walletdb.WriteAccountingEntry(ae);
+#endif
 
     wtx.mapValue["comment"] = "z";
+#ifdef WALLET_DBWRAPPER
+    pwalletMain->AddToWallet(wtx, false, pwalletMain->pwalletdbMain);
+#else
     pwalletMain->AddToWallet(wtx, false, &walletdb);
+#endif
     vpwtx.push_back(&pwalletMain->mapWallet[wtx.GetHash()]);
     vpwtx[0]->nTimeReceived = (unsigned int)1333333335;
     vpwtx[0]->nOrderPos = -1;
 
     ae.nTime = 1333333336;
     ae.strOtherAccount = "c";
+#ifdef WALLET_DBWRAPPER
+    pwalletMain->pwalletdbMain->WriteAccountingEntry(ae);
+
+    GetResults(*pwalletMain->pwalletdbMain, results);
+#else
     walletdb.WriteAccountingEntry(ae);
 
     GetResults(walletdb, results);
+#endif
 
     BOOST_CHECK(pwalletMain->nOrderPosNext == 3);
     BOOST_CHECK(2 == results.size());
@@ -71,9 +87,15 @@ BOOST_AUTO_TEST_CASE(acc_orderupgrade)
     ae.nTime = 1333333330;
     ae.strOtherAccount = "d";
     ae.nOrderPos = pwalletMain->IncOrderPosNext();
+#ifdef WALLET_DBWRAPPER
+    pwalletMain->pwalletdbMain->WriteAccountingEntry(ae);
+
+    GetResults(*pwalletMain->pwalletdbMain, results);
+#else
     walletdb.WriteAccountingEntry(ae);
 
     GetResults(walletdb, results);
+#endif
 
     BOOST_CHECK(results.size() == 3);
     BOOST_CHECK(pwalletMain->nOrderPosNext == 4);
@@ -90,7 +112,11 @@ BOOST_AUTO_TEST_CASE(acc_orderupgrade)
         --tx.nLockTime;  // Just to change the hash :)
         *static_cast<CTransaction*>(&wtx) = CTransaction(tx);
     }
+#ifdef WALLET_DBWRAPPER
+    pwalletMain->AddToWallet(wtx, false, pwalletMain->pwalletdbMain);
+#else
     pwalletMain->AddToWallet(wtx, false, &walletdb);
+#endif
     vpwtx.push_back(&pwalletMain->mapWallet[wtx.GetHash()]);
     vpwtx[1]->nTimeReceived = (unsigned int)1333333336;
 
@@ -100,12 +126,20 @@ BOOST_AUTO_TEST_CASE(acc_orderupgrade)
         --tx.nLockTime;  // Just to change the hash :)
         *static_cast<CTransaction*>(&wtx) = CTransaction(tx);
     }
+#ifdef WALLET_DBWRAPPER
+    pwalletMain->AddToWallet(wtx, false, pwalletMain->pwalletdbMain);
+#else
     pwalletMain->AddToWallet(wtx, false, &walletdb);
+#endif
     vpwtx.push_back(&pwalletMain->mapWallet[wtx.GetHash()]);
     vpwtx[2]->nTimeReceived = (unsigned int)1333333329;
     vpwtx[2]->nOrderPos = -1;
 
+#ifdef WALLET_DBWRAPPER
+    GetResults(*pwalletMain->pwalletdbMain, results);
+#else
     GetResults(walletdb, results);
+#endif
 
     BOOST_CHECK(results.size() == 3);
     BOOST_CHECK(pwalletMain->nOrderPosNext == 6);
@@ -121,9 +155,15 @@ BOOST_AUTO_TEST_CASE(acc_orderupgrade)
     ae.nTime = 1333333334;
     ae.strOtherAccount = "e";
     ae.nOrderPos = -1;
+#ifdef WALLET_DBWRAPPER
+    pwalletMain->pwalletdbMain->WriteAccountingEntry(ae);
+
+    GetResults(*pwalletMain->pwalletdbMain, results);
+#else
     walletdb.WriteAccountingEntry(ae);
 
     GetResults(walletdb, results);
+#endif
 
     BOOST_CHECK(results.size() == 4);
     BOOST_CHECK(pwalletMain->nOrderPosNext == 7);

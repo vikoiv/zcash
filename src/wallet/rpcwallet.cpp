@@ -148,10 +148,16 @@ UniValue getnewaddress(const UniValue& params, bool fHelp)
 
 CBitcoinAddress GetAccountAddress(string strAccount, bool bForceNew=false)
 {
+#ifndef WALLET_DBWRAPPER
     CWalletDB walletdb(pwalletMain->strWalletFile);
+#endif
 
     CAccount account;
+#ifdef WALLET_DBWRAPPER
+    pwalletMain->pwalletdbMain->ReadAccount(strAccount, account);
+#else
     walletdb.ReadAccount(strAccount, account);
+#endif
 
     bool bKeyUsed = false;
 
@@ -177,7 +183,11 @@ CBitcoinAddress GetAccountAddress(string strAccount, bool bForceNew=false)
             throw JSONRPCError(RPC_WALLET_KEYPOOL_RAN_OUT, "Error: Keypool ran out, please call keypoolrefill first");
 
         pwalletMain->SetAddressBook(account.vchPubKey.GetID(), strAccount, "receive");
+#ifdef WALLET_DBWRAPPER
+        pwalletMain->pwalletdbMain->WriteAccount(strAccount, account);
+#else
         walletdb.WriteAccount(strAccount, account);
+#endif
     }
 
     return CBitcoinAddress(account.vchPubKey.GetID());
@@ -703,8 +713,12 @@ CAmount GetAccountBalance(CWalletDB& walletdb, const string& strAccount, int nMi
 
 CAmount GetAccountBalance(const string& strAccount, int nMinDepth, const isminefilter& filter)
 {
+#ifdef WALLET_DBWRAPPER
+    return GetAccountBalance(*(pwalletMain->pwalletdbMain), strAccount, nMinDepth, filter);
+#else
     CWalletDB walletdb(pwalletMain->strWalletFile);
     return GetAccountBalance(walletdb, strAccount, nMinDepth, filter);
+#endif
 }
 
 
@@ -835,33 +849,57 @@ UniValue movecmd(const UniValue& params, bool fHelp)
     if (params.size() > 4)
         strComment = params[4].get_str();
 
+#ifdef WALLET_DBWRAPPER
+    if (!pwalletMain->pwalletdbMain->TxnBegin())
+#else
     CWalletDB walletdb(pwalletMain->strWalletFile);
     if (!walletdb.TxnBegin())
+#endif
         throw JSONRPCError(RPC_DATABASE_ERROR, "database error");
 
     int64_t nNow = GetAdjustedTime();
 
     // Debit
     CAccountingEntry debit;
+#ifdef WALLET_DBWRAPPER
+    debit.nOrderPos = pwalletMain->IncOrderPosNext(pwalletMain->pwalletdbMain);
+#else
     debit.nOrderPos = pwalletMain->IncOrderPosNext(&walletdb);
+#endif
     debit.strAccount = strFrom;
     debit.nCreditDebit = -nAmount;
     debit.nTime = nNow;
     debit.strOtherAccount = strTo;
     debit.strComment = strComment;
+#ifdef WALLET_DBWRAPPER
+    pwalletMain->pwalletdbMain->WriteAccountingEntry(debit);
+#else
     walletdb.WriteAccountingEntry(debit);
+#endif
 
     // Credit
     CAccountingEntry credit;
+#ifdef WALLET_DBWRAPPER
+    credit.nOrderPos = pwalletMain->IncOrderPosNext(pwalletMain->pwalletdbMain);
+#else
     credit.nOrderPos = pwalletMain->IncOrderPosNext(&walletdb);
+#endif
     credit.strAccount = strTo;
     credit.nCreditDebit = nAmount;
     credit.nTime = nNow;
     credit.strOtherAccount = strFrom;
     credit.strComment = strComment;
+#ifdef WALLET_DBWRAPPER
+    pwalletMain->pwalletdbMain->WriteAccountingEntry(credit);
+#else
     walletdb.WriteAccountingEntry(credit);
+#endif
 
+#ifdef WALLET_DBWRAPPER
+    if (!pwalletMain->pwalletdbMain->TxnCommit())
+#else
     if (!walletdb.TxnCommit())
+#endif
         throw JSONRPCError(RPC_DATABASE_ERROR, "database error");
 
     return true;
@@ -1588,7 +1626,11 @@ UniValue listaccounts(const UniValue& params, bool fHelp)
     }
 
     list<CAccountingEntry> acentries;
+#ifdef WALLET_DBWRAPPER
+    pwalletMain->pwalletdbMain->ListAccountCreditDebit("*", acentries);
+#else
     CWalletDB(pwalletMain->strWalletFile).ListAccountCreditDebit("*", acentries);
+#endif
     BOOST_FOREACH(const CAccountingEntry& entry, acentries)
         mapAccountBalances[entry.strAccount] += entry.nCreditDebit;
 

@@ -82,6 +82,12 @@ AC_ARG_ENABLE([wallet],
   [enable_wallet=$enableval],
   [enable_wallet=yes])
 
+AC_ARG_ENABLE([wallet-dbwrapper],
+  [AS_HELP_STRING([--enable-wallet-dbwrapper],
+  [use dbwrapper for wallet (default is no)])],
+  [wallet_dbwrapper=$enableval],
+  [wallet_dbwrapper=no])
+
 AC_ARG_ENABLE([mining],
   [AS_HELP_STRING([--enable-mining],
   [enable mining (default is yes)])],
@@ -832,6 +838,16 @@ if test x$enable_wallet != xno; then
   AC_MSG_RESULT(yes)
   AC_DEFINE_UNQUOTED([ENABLE_WALLET],[1],[Define to 1 to enable wallet functions])
 
+  dnl use dbwrapper for wallet
+  AC_MSG_CHECKING([if wallet should use dbwrapper])
+  if test x$wallet_dbwrapper != xno; then
+    AC_MSG_RESULT(yes)
+    AC_DEFINE_UNQUOTED([WALLET_DBWRAPPER],[1],[Define to 1 to have the wallet use dbwrapper instead of BDB])
+
+  else
+    AC_MSG_RESULT(no)
+  fi
+
 else
   AC_MSG_RESULT(no)
 fi
@@ -884,6 +900,7 @@ AM_CONDITIONAL([TARGET_DARWIN], [test x$TARGET_OS = xdarwin])
 AM_CONDITIONAL([BUILD_DARWIN], [test x$BUILD_OS = xdarwin])
 AM_CONDITIONAL([TARGET_WINDOWS], [test x$TARGET_OS = xwindows])
 AM_CONDITIONAL([ENABLE_WALLET],[test x$enable_wallet = xyes])
+AM_CONDITIONAL([WALLET_DBWRAPPER],[test x$wallet_dbwrapper = xyes])
 AM_CONDITIONAL([ENABLE_MINING],[test x$enable_mining = xyes])
 AM_CONDITIONAL([ENABLE_RUST],[test x$enable_rust = xyes])
 AM_CONDITIONAL([ENABLE_TESTS],[test x$BUILD_TEST = xyes])

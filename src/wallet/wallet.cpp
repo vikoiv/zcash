@@ -111,9 +111,15 @@ bool CWallet::AddZKey(const libzcash::SpendingKey &key)
         return true;
 
     if (!IsCrypted()) {
+#ifdef WALLET_DBWRAPPER
+        return pwalletdbMain->WriteZKey(addr,
+                                        key,
+                                        mapZKeyMetadata[addr]);
+#else
         return CWalletDB(strWalletFile).WriteZKey(addr,
                                                   key,
                                                   mapZKeyMetadata[addr]);
+#endif
     }
     return true;
 }
@@ -159,9 +165,15 @@ bool CWallet::AddKeyPubKey(const CKey& secret, const CPubKey &pubkey)
     if (!fFileBacked)
         return true;
     if (!IsCrypted()) {
+#ifdef WALLET_DBWRAPPER
+        return pwalletdbMain->WriteKey(pubkey,
+                                       secret.GetPrivKey(),
+                                       mapKeyMetadata[pubkey.GetID()]);
+#else
         return CWalletDB(strWalletFile).WriteKey(pubkey,
                                                  secret.GetPrivKey(),
                                                  mapKeyMetadata[pubkey.GetID()]);
+#endif
     }
     return true;
 }
@@ -181,9 +193,15 @@ bool CWallet::AddCryptedKey(const CPubKey &vchPubKey,
                                                         vchCryptedSecret,
                                                         mapKeyMetadata[vchPubKey.GetID()]);
         else
+#ifdef WALLET_DBWRAPPER
+            return pwalletdbMain->WriteCryptedKey(vchPubKey,
+                                                  vchCryptedSecret,
+                                                  mapKeyMetadata[vchPubKey.GetID()]);
+#else
             return CWalletDB(strWalletFile).WriteCryptedKey(vchPubKey,
                                                             vchCryptedSecret,
                                                             mapKeyMetadata[vchPubKey.GetID()]);
+#endif
     }
     return false;
 }
@@ -205,10 +223,17 @@ bool CWallet::AddCryptedSpendingKey(const libzcash::PaymentAddress &address,
                                                          vchCryptedSecret,
                                                          mapZKeyMetadata[address]);
         } else {
+#ifdef WALLET_DBWRAPPER
+            return pwalletdbMain->WriteCryptedZKey(address,
+                                                   vk,
+                                                   vchCryptedSecret,
+                                                   mapZKeyMetadata[address]);
+#else
             return CWalletDB(strWalletFile).WriteCryptedZKey(address,
                                                              vk,
                                                              vchCryptedSecret,
                                                              mapZKeyMetadata[address]);
+#endif
         }
     }
     return false;
@@ -252,7 +277,11 @@ bool CWallet::AddCScript(const CScript& redeemScript)
         return false;
     if (!fFileBacked)
         return true;
+#ifdef WALLET_DBWRAPPER
+    return pwalletdbMain->WriteCScript(Hash160(redeemScript), redeemScript);
+#else
     return CWalletDB(strWalletFile).WriteCScript(Hash160(redeemScript), redeemScript);
+#endif
 }
 
 bool CWallet::LoadCScript(const CScript& redeemScript)
@@ -279,7 +308,11 @@ bool CWallet::AddWatchOnly(const CScript &dest)
     NotifyWatchonlyChanged(true);
     if (!fFileBacked)
         return true;
+#ifdef WALLET_DBWRAPPER
+    return pwalletdbMain->WriteWatchOnly(dest);
+#else
     return CWalletDB(strWalletFile).WriteWatchOnly(dest);
+#endif
 }
 
 bool CWallet::RemoveWatchOnly(const CScript &dest)
@@ -290,7 +323,11 @@ bool CWallet::RemoveWatchOnly(const CScript &dest)
     if (!HaveWatchOnly())
         NotifyWatchonlyChanged(false);
     if (fFileBacked)
+#ifdef WALLET_DBWRAPPER
+        if (!pwalletdbMain->EraseWatchOnly(dest))
+#else
         if (!CWalletDB(strWalletFile).EraseWatchOnly(dest))
+#endif
             return false;
 
     return true;
@@ -356,7 +393,11 @@ bool CWallet::ChangeWalletPassphrase(const SecureString& strOldWalletPassphrase,
                     return false;
                 if (!crypter.Encrypt(vMasterKey, pMasterKey.second.vchCryptedKey))
                     return false;
+#ifdef WALLET_DBWRAPPER
+                pwalletdbMain->WriteMasterKey(pMasterKey.first, pMasterKey.second);
+#else
                 CWalletDB(strWalletFile).WriteMasterKey(pMasterKey.first, pMasterKey.second);
+#endif
                 if (fWasLocked)
                     Lock();
                 return true;
@@ -379,8 +420,12 @@ void CWallet::ChainTip(const CBlockIndex *pindex, const CBlock *pblock,
 
 void CWallet::SetBestChain(const CBlockLocator& loc)
 {
+#ifdef WALLET_DBWRAPPER
+    SetBestChainINTERNAL(*pwalletdbMain, loc);
+#else
     CWalletDB walletdb(strWalletFile);
     SetBestChainINTERNAL(walletdb, loc);
+#endif
 }
 
 bool CWallet::SetMinVersion(enum WalletFeature nVersion, CWalletDB* pwalletdbIn, bool fExplicit)
@@ -400,11 +445,17 @@ bool CWallet::SetMinVersion(enum WalletFeature nVersion, CWalletDB* pwalletdbIn,
 
     if (fFileBacked)
     {
+#ifdef WALLET_DBWRAPPER
+        CWalletDB* pwalletdb = pwalletdbIn ? pwalletdbIn : pwalletdbMain;
+#else
         CWalletDB* pwalletdb = pwalletdbIn ? pwalletdbIn : new CWalletDB(strWalletFile);
+#endif
         if (nWalletVersion > 40000)
             pwalletdb->WriteMinVersion(nWalletVersion);
+#ifndef WALLET_DBWRAPPER
         if (!pwalletdbIn)
             delete pwalletdb;
+#endif
     }
 
     return true;
@@ -461,11 +512,18 @@ set<uint256> CWallet::GetConflicts(const uint256& txid) const
 
 void CWallet::Flush(bool shutdown)
 {
+#ifdef WALLET_DBWRAPPER
+    pwalletdbMain->Flush();
+#else
     bitdb.Flush(shutdown);
+#endif
 }
 
 bool CWallet::Verify(const string& walletFile, string& warningString, string& errorString)
 {
+#ifdef WALLET_DBWRAPPER
+    // XXX: No way to do verification or recovery in LevelDB / dbwrapper
+#else
     if (!bitdb.Open(GetDataDir()))
     {
         // try moving the database env out of the way
@@ -507,6 +565,7 @@ bool CWallet::Verify(const string& walletFile, string& warningString, string& er
         if (r == CDBEnv::RECOVER_FAIL)
             errorString += _("wallet.dat corrupt, salvage failed");
     }
+#endif
     
     return true;
 }
@@ -848,9 +907,15 @@ bool CWallet::EncryptWallet(const SecureString& strWalletPassphrase)
         if (fFileBacked)
         {
             assert(!pwalletdbEncryption);
+#ifdef WALLET_DBWRAPPER
+            pwalletdbEncryption = pwalletdbMain;
+#else
             pwalletdbEncryption = new CWalletDB(strWalletFile);
+#endif
             if (!pwalletdbEncryption->TxnBegin()) {
+#ifndef WALLET_DBWRAPPER
                 delete pwalletdbEncryption;
+#endif
                 pwalletdbEncryption = NULL;
                 return false;
             }
@@ -861,7 +926,9 @@ bool CWallet::EncryptWallet(const SecureString& strWalletPassphrase)
         {
             if (fFileBacked) {
                 pwalletdbEncryption->TxnAbort();
+#ifndef WALLET_DBWRAPPER
                 delete pwalletdbEncryption;
+#endif
             }
             // We now probably have half of our keys encrypted in memory, and half not...
             // die and let the user reload the unencrypted wallet.
@@ -874,13 +941,17 @@ bool CWallet::EncryptWallet(const SecureString& strWalletPassphrase)
         if (fFileBacked)
         {
             if (!pwalletdbEncryption->TxnCommit()) {
+#ifndef WALLET_DBWRAPPER
                 delete pwalletdbEncryption;
+#endif
                 // We now have keys encrypted in memory, but not on disk...
                 // die to avoid confusion and let the user reload the unencrypted wallet.
                 assert(false);
             }
 
+#ifndef WALLET_DBWRAPPER
             delete pwalletdbEncryption;
+#endif
             pwalletdbEncryption = NULL;
         }
 
@@ -889,9 +960,13 @@ bool CWallet::EncryptWallet(const SecureString& strWalletPassphrase)
         NewKeyPool();
         Lock();
 
+#ifdef WALLET_DBWRAPPER
+        // TODO: Determine if this is necessary for LevelDB / dbwrapper
+#else
         // Need to completely rewrite the wallet file; if we don't, bdb might keep
         // bits of the unencrypted private key in slack space in the database file.
         CDB::Rewrite(strWalletFile);
+#endif
 
     }
     NotifyStatusChanged(this);
@@ -906,7 +981,11 @@ int64_t CWallet::IncOrderPosNext(CWalletDB *pwalletdb)
     if (pwalletdb) {
         pwalletdb->WriteOrderPosNext(nOrderPosNext);
     } else {
+#ifdef WALLET_DBWRAPPER
+        pwalletdbMain->WriteOrderPosNext(nOrderPosNext);
+#else
         CWalletDB(strWalletFile).WriteOrderPosNext(nOrderPosNext);
+#endif
     }
     return nRet;
 }
@@ -914,7 +993,9 @@ int64_t CWallet::IncOrderPosNext(CWalletDB *pwalletdb)
 CWallet::TxItems CWallet::OrderedTxItems(std::list<CAccountingEntry>& acentries, std::string strAccount)
 {
     AssertLockHeld(cs_wallet); // mapWallet
+#ifndef WALLET_DBWRAPPER
     CWalletDB walletdb(strWalletFile);
+#endif
 
     // First: get all CWalletTx and CAccountingEntry into a sorted-by-order multimap.
     TxItems txOrdered;
@@ -927,7 +1008,11 @@ CWallet::TxItems CWallet::OrderedTxItems(std::list<CAccountingEntry>& acentries,
         txOrdered.insert(make_pair(wtx->nOrderPos, TxPair(wtx, (CAccountingEntry*)0)));
     }
     acentries.clear();
+#ifdef WALLET_DBWRAPPER
+    pwalletdbMain->ListAccountCreditDebit(strAccount, acentries);
+#else
     walletdb.ListAccountCreditDebit(strAccount, acentries);
+#endif
     BOOST_FOREACH(CAccountingEntry& entry, acentries)
     {
         txOrdered.insert(make_pair(entry.nOrderPos, TxPair((CWalletTx*)0, &entry)));
@@ -1161,11 +1246,15 @@ bool CWallet::AddToWalletIfInvolvingMe(const CTransaction& tx, const CBlock* pbl
             if (pblock)
                 wtx.SetMerkleBranch(*pblock);
 
+#ifdef WALLET_DBWRAPPER
+            return AddToWallet(wtx, false, pwalletdbMain);
+#else
             // Do not flush the wallet here for performance reasons
             // this is safe, as in case of a crash, we rescan the necessary blocks on startup through our SetBestChain-mechanism
             CWalletDB walletdb(strWalletFile, "r+", false);
 
             return AddToWallet(wtx, false, &walletdb);
+#endif
         }
     }
     return false;
@@ -1207,7 +1296,11 @@ void CWallet::EraseFromWallet(const uint256 &hash)
     {
         LOCK(cs_wallet);
         if (mapWallet.erase(hash))
+#ifdef WALLET_DBWRAPPER
+            pwalletdbMain->EraseTx(hash);
+#else
             CWalletDB(strWalletFile).EraseTx(hash);
+#endif
     }
     return;
 }
@@ -2817,7 +2910,11 @@ bool CWallet::CommitTransaction(CWalletTx& wtxNew, CReserveKey& reservekey)
             // This is only to keep the database open to defeat the auto-flush for the
             // duration of this scope.  This is the only place where this optimization
             // maybe makes sense; please don't do it anywhere else.
+#ifdef WALLET_DBWRAPPER
+            CWalletDB* pwalletdb = fFileBacked ? pwalletdbMain : NULL;
+#else
             CWalletDB* pwalletdb = fFileBacked ? new CWalletDB(strWalletFile,"r+") : NULL;
+#endif
 
             // Take key pair from key pool so it won't be used again
             reservekey.KeepKey();
@@ -2888,6 +2985,9 @@ DBErrors CWallet::LoadWallet(bool& fFirstRunRet)
     if (!fFileBacked)
         return DB_LOAD_OK;
     fFirstRunRet = false;
+#ifdef WALLET_DBWRAPPER
+    DBErrors nLoadWalletRet = pwalletdbMain->LoadWallet(this);
+#else
     DBErrors nLoadWalletRet = CWalletDB(strWalletFile,"cr+").LoadWallet(this);
     if (nLoadWalletRet == DB_NEED_REWRITE)
     {
@@ -2900,6 +3000,7 @@ DBErrors CWallet::LoadWallet(bool& fFirstRunRet)
             // that requires a new key.
         }
     }
+#endif
 
     if (nLoadWalletRet != DB_LOAD_OK)
         return nLoadWalletRet;
@@ -2915,6 +3016,9 @@ DBErrors CWallet::ZapWalletTx(std::vector<CWalletTx>& vWtx)
 {
     if (!fFileBacked)
         return DB_LOAD_OK;
+#ifdef WALLET_DBWRAPPER
+    DBErrors nZapWalletTxRet = pwalletdbMain->ZapWalletTx(this, vWtx);
+#else
     DBErrors nZapWalletTxRet = CWalletDB(strWalletFile,"cr+").ZapWalletTx(this, vWtx);
     if (nZapWalletTxRet == DB_NEED_REWRITE)
     {
@@ -2927,6 +3031,7 @@ DBErrors CWallet::ZapWalletTx(std::vector<CWalletTx>& vWtx)
             // that requires a new key.
         }
     }
+#endif
 
     if (nZapWalletTxRet != DB_LOAD_OK)
         return nZapWalletTxRet;
@@ -2950,9 +3055,15 @@ bool CWallet::SetAddressBook(const CTxDestination& address, const string& strNam
                              strPurpose, (fUpdated ? CT_UPDATED : CT_NEW) );
     if (!fFileBacked)
         return false;
+#ifdef WALLET_DBWRAPPER
+    if (!strPurpose.empty() && !pwalletdbMain->WritePurpose(CBitcoinAddress(address).ToString(), strPurpose))
+        return false;
+    return pwalletdbMain->WriteName(CBitcoinAddress(address).ToString(), strName);
+#else
     if (!strPurpose.empty() && !CWalletDB(strWalletFile).WritePurpose(CBitcoinAddress(address).ToString(), strPurpose))
         return false;
     return CWalletDB(strWalletFile).WriteName(CBitcoinAddress(address).ToString(), strName);
+#endif
 }
 
 bool CWallet::DelAddressBook(const CTxDestination& address)
@@ -2966,7 +3077,11 @@ bool CWallet::DelAddressBook(const CTxDestination& address)
             std::string strAddress = CBitcoinAddress(address).ToString();
             BOOST_FOREACH(const PAIRTYPE(string, string) &item, mapAddressBook[address].destdata)
             {
+#ifdef WALLET_DBWRAPPER
+                pwalletdbMain->EraseDestData(strAddress, item.first);
+#else
                 CWalletDB(strWalletFile).EraseDestData(strAddress, item.first);
+#endif
             }
         }
         mapAddressBook.erase(address);
@@ -2976,15 +3091,24 @@ bool CWallet::DelAddressBook(const CTxDestination& address)
 
     if (!fFileBacked)
         return false;
+#ifdef WALLET_DBWRAPPER
+    pwalletdbMain->ErasePurpose(CBitcoinAddress(address).ToString());
+    return pwalletdbMain->EraseName(CBitcoinAddress(address).ToString());
+#else
     CWalletDB(strWalletFile).ErasePurpose(CBitcoinAddress(address).ToString());
     return CWalletDB(strWalletFile).EraseName(CBitcoinAddress(address).ToString());
+#endif
 }
 
 bool CWallet::SetDefaultKey(const CPubKey &vchPubKey)
 {
     if (fFileBacked)
     {
+#ifdef WALLET_DBWRAPPER
+        if (!pwalletdbMain->WriteDefaultKey(vchPubKey))
+#else
         if (!CWalletDB(strWalletFile).WriteDefaultKey(vchPubKey))
+#endif
             return false;
     }
     vchDefaultKey = vchPubKey;
@@ -2999,9 +3123,15 @@ bool CWallet::NewKeyPool()
 {
     {
         LOCK(cs_wallet);
+#ifndef WALLET_DBWRAPPER
         CWalletDB walletdb(strWalletFile);
+#endif
         BOOST_FOREACH(int64_t nIndex, setKeyPool)
+#ifdef WALLET_DBWRAPPER
+            pwalletdbMain->ErasePool(nIndex);
+#else
             walletdb.ErasePool(nIndex);
+#endif
         setKeyPool.clear();
 
         if (IsLocked())
@@ -3011,7 +3141,11 @@ bool CWallet::NewKeyPool()
         for (int i = 0; i < nKeys; i++)
         {
             int64_t nIndex = i+1;
+#ifdef WALLET_DBWRAPPER
+            pwalletdbMain->WritePool(nIndex, CKeyPool(GenerateNewKey()));
+#else
             walletdb.WritePool(nIndex, CKeyPool(GenerateNewKey()));
+#endif
             setKeyPool.insert(nIndex);
         }
         LogPrintf("CWallet::NewKeyPool wrote %d new keys\n", nKeys);
@@ -3027,7 +3161,9 @@ bool CWallet::TopUpKeyPool(unsigned int kpSize)
         if (IsLocked())
             return false;
 
+#ifndef WALLET_DBWRAPPER
         CWalletDB walletdb(strWalletFile);
+#endif
 
         // Top up key pool
         unsigned int nTargetSize;
@@ -3041,7 +3177,11 @@ bool CWallet::TopUpKeyPool(unsigned int kpSize)
             int64_t nEnd = 1;
             if (!setKeyPool.empty())
                 nEnd = *(--setKeyPool.end()) + 1;
+#ifdef WALLET_DBWRAPPER
+            if (!pwalletdbMain->WritePool(nEnd, CKeyPool(GenerateNewKey())))
+#else
             if (!walletdb.WritePool(nEnd, CKeyPool(GenerateNewKey())))
+#endif
                 throw runtime_error("TopUpKeyPool(): writing generated key failed");
             setKeyPool.insert(nEnd);
             LogPrintf("keypool added key %d, size=%u\n", nEnd, setKeyPool.size());
@@ -3064,11 +3204,17 @@ void CWallet::ReserveKeyFromKeyPool(int64_t& nIndex, CKeyPool& keypool)
         if(setKeyPool.empty())
             return;
 
+#ifndef WALLET_DBWRAPPER
         CWalletDB walletdb(strWalletFile);
+#endif
 
         nIndex = *(setKeyPool.begin());
         setKeyPool.erase(setKeyPool.begin());
+#ifdef WALLET_DBWRAPPER
+        if (!pwalletdbMain->ReadPool(nIndex, keypool))
+#else
         if (!walletdb.ReadPool(nIndex, keypool))
+#endif
             throw runtime_error("ReserveKeyFromKeyPool(): read failed");
         if (!HaveKey(keypool.vchPubKey.GetID()))
             throw runtime_error("ReserveKeyFromKeyPool(): unknown key in key pool");
@@ -3082,8 +3228,12 @@ void CWallet::KeepKey(int64_t nIndex)
     // Remove from key pool
     if (fFileBacked)
     {
+#ifdef WALLET_DBWRAPPER
+        pwalletdbMain->ErasePool(nIndex);
+#else
         CWalletDB walletdb(strWalletFile);
         walletdb.ErasePool(nIndex);
+#endif
     }
     LogPrintf("keypool keep %d\n", nIndex);
 }
@@ -3312,13 +3462,19 @@ void CWallet::GetAllReserveKeys(set<CKeyID>& setAddress) const
 {
     setAddress.clear();
 
+#ifndef WALLET_DBWRAPPER
     CWalletDB walletdb(strWalletFile);
+#endif
 
     LOCK2(cs_main, cs_wallet);
     BOOST_FOREACH(const int64_t& id, setKeyPool)
     {
         CKeyPool keypool;
+#ifdef WALLET_DBWRAPPER
+        if (!pwalletdbMain->ReadPool(id, keypool))
+#else
         if (!walletdb.ReadPool(id, keypool))
+#endif
             throw runtime_error("GetAllReserveKeyHashes(): read failed");
         assert(keypool.vchPubKey.IsValid());
         CKeyID keyID = keypool.vchPubKey.GetID();
@@ -3469,7 +3625,11 @@ bool CWallet::AddDestData(const CTxDestination &dest, const std::string &key, co
     mapAddressBook[dest].destdata.insert(std::make_pair(key, value));
     if (!fFileBacked)
         return true;
+#ifdef WALLET_DBWRAPPER
+    return pwalletdbMain->WriteDestData(CBitcoinAddress(dest).ToString(), key, value);
+#else
     return CWalletDB(strWalletFile).WriteDestData(CBitcoinAddress(dest).ToString(), key, value);
+#endif
 }
 
 bool CWallet::EraseDestData(const CTxDestination &dest, const std::string &key)
@@ -3478,7 +3638,11 @@ bool CWallet::EraseDestData(const CTxDestination &dest, const std::string &key)
         return false;
     if (!fFileBacked)
         return true;
+#ifdef WALLET_DBWRAPPER
+    return pwalletdbMain->EraseDestData(CBitcoinAddress(dest).ToString(), key);
+#else
     return CWalletDB(strWalletFile).EraseDestData(CBitcoinAddress(dest).ToString(), key);
+#endif
 }
 
 bool CWallet::LoadDestData(const CTxDestination &dest, const std::string &key, const std::string &value)

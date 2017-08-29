@@ -1080,7 +1080,9 @@ bool AppInit2(boost::thread_group& threadGroup, CScheduler& scheduler)
 
     LogPrintf("Using OpenSSL version %s\n", SSLeay_version(SSLEAY_VERSION));
 #ifdef ENABLE_WALLET
+  #ifndef WALLET_DBWRAPPER
     LogPrintf("Using BerkeleyDB version %s\n", DbEnv::version(0, 0, 0));
+  #endif
 #endif
     if (!fLogTimestamps)
         LogPrintf("Startup time: %s\n", DateTimeStrFormat("%Y-%m-%d %H:%M:%S", GetTime()));
@@ -1536,7 +1538,11 @@ bool AppInit2(boost::thread_group& threadGroup, CScheduler& scheduler)
         }
         else
         {
+#ifdef WALLET_DBWRAPPER
+            CWalletDB walletdb(1);
+#else
             CWalletDB walletdb(strWalletFile);
+#endif
             CBlockLocator locator;
             if (walletdb.ReadBestBlock(locator))
                 pindexRescan = FindForkInGlobalIndex(chainActive, locator);
@@ -1556,7 +1562,11 @@ bool AppInit2(boost::thread_group& threadGroup, CScheduler& scheduler)
             // Restore wallet transaction metadata after -zapwallettxes=1
             if (GetBoolArg("-zapwallettxes", false) && GetArg("-zapwallettxes", "1") != "2")
             {
+#ifdef WALLET_DBWRAPPER
+                CWalletDB walletdb(1);
+#else
                 CWalletDB walletdb(strWalletFile);
+#endif
 
                 BOOST_FOREACH(const CWalletTx& wtxOld, vWtx)
                 {

@@ -581,6 +581,11 @@ class CWallet : public CCryptoKeyStore, public CValidationInterface
 private:
     bool SelectCoins(const CAmount& nTargetValue, std::set<std::pair<const CWalletTx*,unsigned int> >& setCoinsRet, CAmount& nValueRet, bool& fOnlyCoinbaseCoinsRet, bool& fNeedCoinbaseCoinsRet, const CCoinControl *coinControl = NULL) const;
 
+#ifdef WALLET_DBWRAPPER
+public:
+    CWalletDB *pwalletdbMain;
+private:
+#endif
     CWalletDB *pwalletdbEncryption;
 
     //! the current wallet version: clients below this version are not able to load the wallet
@@ -706,6 +711,8 @@ public:
     CWallet()
     {
         SetNull();
+
+        // TODO: Set up dbwrapper
     }
 
     CWallet(const std::string& strWalletFileIn)
@@ -713,11 +720,14 @@ public:
         SetNull();
 
         strWalletFile = strWalletFileIn;
+        pwalletdbMain = new CWalletDB(1);
         fFileBacked = true;
     }
 
     ~CWallet()
     {
+        delete pwalletdbMain;
+        pwalletdbMain = NULL;
         delete pwalletdbEncryption;
         pwalletdbEncryption = NULL;
     }

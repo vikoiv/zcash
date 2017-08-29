@@ -271,8 +271,13 @@ libbitcoin_wallet_a_SOURCES = \
   zcbenchmarks.cpp \
   zcbenchmarks.h \
   wallet/asyncrpcoperation_sendmany.cpp \
-  wallet/crypter.cpp \
-  wallet/db.cpp \
+  wallet/crypter.cpp
+if WALLET_DBWRAPPER
+else
+libbitcoin_wallet_a_SOURCES += \
+  wallet/db.cpp
+endif
+libbitcoin_wallet_a_SOURCES += \
   wallet/rpcdump.cpp \
   wallet/rpcwallet.cpp \
   wallet/wallet.cpp \

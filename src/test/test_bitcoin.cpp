@@ -49,7 +49,9 @@ BasicTestingSetup::~BasicTestingSetup()
 TestingSetup::TestingSetup()
 {
 #ifdef ENABLE_WALLET
+  #ifndef WALLET_DBWRAPPER
         bitdb.MakeMock();
+  #endif
 #endif
         ClearDatadirCache();
         pathTemp = GetTempPath() / strprintf("test_bitcoin_%lu_%i", (unsigned long)GetTime(), (int)(GetRand(100000)));
@@ -86,8 +88,10 @@ TestingSetup::~TestingSetup()
         delete pcoinsdbview;
         delete pblocktree;
 #ifdef ENABLE_WALLET
+  #ifndef WALLET_DBWRAPPER
         bitdb.Flush(true);
         bitdb.Reset();
+  #endif
 #endif
         boost::filesystem::remove_all(pathTemp);
 }
