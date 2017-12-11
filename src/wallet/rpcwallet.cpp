@@ -23,6 +23,7 @@
 #include "utiltime.h"
 #include "asyncrpcoperation.h"
 #include "asyncrpcqueue.h"
+#include "wallet/asyncrpcoperation_mergetoaddress.h"
 #include "wallet/asyncrpcoperation_sendmany.h"
 #include "wallet/asyncrpcoperation_shieldcoinbase.h"
 
@@ -3721,6 +3722,306 @@ UniValue z_shieldcoinbase(const UniValue& params, bool fHelp)
     o.push_back(Pair("remainingValue", ValueFromAmount(remainingValue)));
     o.push_back(Pair("shieldingUTXOs", numUtxos));
     o.push_back(Pair("shieldingValue", ValueFromAmount(shieldedValue)));
+    o.push_back(Pair("opid", operationId));
+    return o;
+}
+
+
+#define MERGE_TO_ADDRESS_DEFAULT_TRANSPARENT_LIMIT 50
+#define MERGE_TO_ADDRESS_DEFAULT_SHIELDED_LIMIT 10
+
+#define JOINSPLIT_SIZE JSDescription().GetSerializeSize(SER_NETWORK, PROTOCOL_VERSION)
+
+UniValue z_mergetoaddress(const UniValue& params, bool fHelp)
+{
+    if (!EnsureWalletIsAvailable(fHelp))
+        return NullUniValue;
+
+    if (fHelp || params.size() < 2 || params.size() > 6)
+        throw runtime_error(
+            "z_mergetoaddress [\"fromaddress\", ... ] \"toaddress\" ( fee ) ( transparent_limit ) ( shielded_limit ) ( memo )\n"
+            "\nMerge multiple UTXOs and notes into a single UTXO or note.  Coinbase UTXOs are ignored; use `z_shieldcoinbase`"
+            "\nto combine those into a single note."
+            "\n\nThis is an asynchronous operation, and UTXOs selected for merging will be locked.  If there is an error, they"
+            "\nare unlocked.  The RPC call `listlockunspent` can be used to return a list of locked UTXOs."
+            "\n\nThe number of UTXOs selected for merging can be limited by the caller.  If the limit parameter is set to zero,"
+            "\nthe -mempooltxinputlimit option will determine the number of UTXOs.  Any limit is constrained by the consensus"
+            "\nrule defining a maximum transaction size of "
+            + strprintf("%d bytes.", MAX_TX_SIZE)
+            + HelpRequiringPassphrase() + "\n"
+            "\nArguments:\n"
+            "1. fromaddresses         (string, required) A JSON array with addresses.\n"
+            "                         The following special strings are also accepted:\n"
+            "                             - \"*\": Merge both UTXOs and notes from all addressed belonging to the wallet.\n"
+            "                             - \"ANY_TADDR\": Merge UTXOs from all taddrs belonging to the wallet.\n"
+            "                             - \"ANY_ZADDR\": Merge notes from all zaddrs belonging to the wallet.\n"
+            "    [\n"
+            "      \"address\"            (string) Can be a t-addr or a z-addr\n"
+            "      ,...\n"
+            "    ]\n"
+            "2. \"toaddress\"           (string, required) The taddr or zaddr to send the funds to.\n"
+            "3. fee                   (numeric, optional, default="
+            + strprintf("%s", FormatMoney(MERGE_TO_ADDRESS_OPERATION_DEFAULT_MINERS_FEE)) + ") The fee amount to attach to this transaction.\n"
+            "4. utxo_limit            (numeric, optional, default="
+            + strprintf("%d", MERGE_TO_ADDRESS_DEFAULT_TRANSPARENT_LIMIT) + ") Limit on the maximum number of UTXOs to merge.  Set to 0 to use node option -mempooltxinputlimit.\n"
+            "4. note_limit            (numeric, optional, default="
+            + strprintf("%d", MERGE_TO_ADDRESS_DEFAULT_SHIELDED_LIMIT) + ") Limit on the maximum number of notes to merge.  Set to 0 to merge as many as will fit in the transaction.\n"
+            "5. \"memo\"                (string, optional) If toaddress is a zaddr, this will be put in the memo field of the new note.\n"
+            "\nResult:\n"
+            "{\n"
+            "  \"remainingUTXOs\": xxx               (numeric) Number of UTXOs still available for merging.\n"
+            "  \"remainingTransparentValue\": xxx    (numeric) Value of UTXOs still available for merging.\n"
+            "  \"remainingNotes\": xxx               (numeric) Number of notes still available for merging.\n"
+            "  \"remainingShieldedValue\": xxx       (numeric) Value of notes still available for merging.\n"
+            "  \"mergingUTXOs\": xxx                 (numeric) Number of UTXOs being merged.\n"
+            "  \"mergingTransparentValue\": xxx      (numeric) Value of UTXOs being merged.\n"
+            "  \"mergingNotes\": xxx                 (numeric) Number of notes being merged.\n"
+            "  \"mergingShieldedValue\": xxx         (numeric) Value of notes being merged.\n"
+            "  \"opid\": xxx          (string) An operationid to pass to z_getoperationstatus to get the result of the operation.\n"
+            "}\n"
+            "\nExamples:\n"
+            + HelpExampleCli("z_mergetoaddress", "[\"t1M72Sfpbz1BPpXFHz9m3CdqATR44Jvaydd\"] \"ztfaW34Gj9FrnGUEf833ywDVL62NWXBM81u6EQnM6VR45eYnXhwztecW1SjxA7JrmAXKJhxhj3vDNEpVCQoSvVoSpmbhtjf\"")
+            + HelpExampleRpc("z_mergetoaddress", "[\"t1M72Sfpbz1BPpXFHz9m3CdqATR44Jvaydd\"], \"ztfaW34Gj9FrnGUEf833ywDVL62NWXBM81u6EQnM6VR45eYnXhwztecW1SjxA7JrmAXKJhxhj3vDNEpVCQoSvVoSpmbhtjf\"")
+        );
+
+    LOCK2(cs_main, pwalletMain->cs_wallet);
+
+    // Validate the from addresses
+    std::string fromaddresses = "";
+    if (params[0].isStr()) {
+        fromaddresses = params[0].get_str();
+    }
+    bool useAny = fromaddresses == "*";
+    bool useAnyUTXO = fromaddresses == "ANY_TADDR";
+    bool useAnyNote = fromaddresses == "ANY_ZADDR";
+    std::set<CBitcoinAddress> taddrs = {};
+    std::set<libzcash::PaymentAddress> zaddrs = {};
+    if (!(useAny || useAnyUTXO || useAnyNote)) {
+        UniValue outputs = params[0].get_array();
+
+        if (outputs.size()==0)
+            throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid parameter, fromaddresses array is empty.");
+
+        // Keep track of addresses to spot duplicates
+        set<std::string> setAddress;
+
+        // Sources
+        for (const UniValue& o : outputs.getValues()) {
+            if (!o.isStr())
+                throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid parameter, expected string");
+
+            string address = o.get_str();
+            CBitcoinAddress taddr(address);
+            if (taddr.IsValid()) {
+                taddrs.insert(taddr);
+            } else {
+                try {
+                    CZCPaymentAddress zaddr(address);
+                    zaddrs.insert(zaddr.Get());
+                } catch (const std::runtime_error&) {
+                    throw JSONRPCError(RPC_INVALID_PARAMETER, string("Invalid parameter, unknown address format: ") + address);
+                }
+            }
+
+            if (setAddress.count(address))
+                throw JSONRPCError(RPC_INVALID_PARAMETER, string("Invalid parameter, duplicated address: ") + address);
+            setAddress.insert(address);
+        }
+    }
+
+    // Validate the destination address
+    auto destaddress = params[1].get_str();
+    bool isToZaddr = false;
+    CBitcoinAddress taddr(destaddress);
+    if (!taddr.IsValid()) {
+        try {
+            CZCPaymentAddress zaddr(destaddress);
+            zaddr.Get();
+            isToZaddr = true;
+        } catch (const std::runtime_error&) {
+            throw JSONRPCError(RPC_INVALID_PARAMETER, string("Invalid parameter, unknown address format: ") + destaddress );
+        }
+    }
+
+    // Convert fee from currency format to zatoshis
+    CAmount nFee = SHIELD_COINBASE_DEFAULT_MINERS_FEE;
+    if (params.size() > 2) {
+        if (params[2].get_real() == 0.0) {
+            nFee = 0;
+        } else {
+            nFee = AmountFromValue( params[2] );
+        }
+    }
+
+    int nUTXOLimit = MERGE_TO_ADDRESS_DEFAULT_TRANSPARENT_LIMIT;
+    if (params.size() > 3) {
+        nUTXOLimit = params[3].get_int();
+        if (nUTXOLimit < 0) {
+            throw JSONRPCError(RPC_INVALID_PARAMETER, "Limit on maximum number of UTXOs cannot be negative");
+        }
+    }
+
+    int nNoteLimit = MERGE_TO_ADDRESS_DEFAULT_SHIELDED_LIMIT;
+    if (params.size() > 4) {
+        nNoteLimit = params[4].get_int();
+        if (nNoteLimit < 0) {
+            throw JSONRPCError(RPC_INVALID_PARAMETER, "Limit on maximum number of notes cannot be negative");
+        }
+    }
+
+    string memo;
+    if (params.size() > 5) {
+        memo = params[5].get_str();
+        if (!isToZaddr) {
+            throw JSONRPCError(RPC_INVALID_PARAMETER, "Memo can not be used with a taddr.  It can only be used with a zaddr.");
+        } else if (!IsHex(memo)) {
+            throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid parameter, expected memo data in hexadecimal format.");
+        }
+        if (memo.length() > ZC_MEMO_SIZE*2) {
+            throw JSONRPCError(RPC_INVALID_PARAMETER,  strprintf("Invalid parameter, size of memo is larger than maximum allowed %d", ZC_MEMO_SIZE ));
+        }
+    }
+
+    MergeToAddressRecipient recipient(destaddress, memo);
+
+    // Prepare to get UTXOs and notes
+    std::vector<MergeToAddressInputUTXO> utxoInputs;
+    std::vector<MergeToAddressInputNote> noteInputs;
+    CAmount mergedUTXOValue = 0;
+    CAmount mergedNoteValue = 0;
+    CAmount remainingUTXOValue = 0;
+    CAmount remainingNoteValue = 0;
+    size_t utxoCounter = 0;
+    size_t noteCounter = 0;
+    bool maxedOutUTXOsFlag = false;
+    bool maxedOutNotesFlag = false;
+    size_t mempoolLimit = (nUTXOLimit != 0) ? nUTXOLimit : (size_t)GetArg("-mempooltxinputlimit", 0);
+
+    size_t estimatedTxSize = 200;  // tx overhead + wiggle room
+    if (isToZaddr) {
+        estimatedTxSize += JOINSPLIT_SIZE;
+    }
+
+    if (useAny || useAnyUTXO || taddrs.size() > 0) {
+        // Get available utxos
+        vector<COutput> vecOutputs;
+        pwalletMain->AvailableCoins(vecOutputs, true, NULL, false, false);
+
+        // Find unspent utxos and update estimated size
+        for (const COutput& out : vecOutputs) {
+            if (!out.fSpendable) {
+                continue;
+            }
+
+            CTxDestination address;
+            if (!ExtractDestination(out.tx->vout[out.i].scriptPubKey, address)) {
+                continue;
+            }
+            // If taddr is not wildcard "*", filter utxos
+            if (taddrs.size() > 0 && !taddrs.count(address)) {
+                continue;
+            }
+
+            utxoCounter++;
+            CAmount nValue = out.tx->vout[out.i].nValue;
+
+            if (!maxedOutUTXOsFlag) {
+                CBitcoinAddress ba(address);
+                size_t increase = (ba.IsScript()) ? CTXIN_SPEND_P2SH_SIZE : CTXIN_SPEND_DUST_SIZE;
+                if (estimatedTxSize + increase >= MAX_TX_SIZE ||
+                    (mempoolLimit > 0 && utxoCounter > mempoolLimit))
+                {
+                    maxedOutUTXOsFlag = true;
+                } else {
+                    estimatedTxSize += increase;
+                    COutPoint utxo(out.tx->GetHash(), out.i);
+                    utxoInputs.emplace_back(utxo, nValue);
+                    mergedUTXOValue += nValue;
+                }
+            }
+
+            if (maxedOutUTXOsFlag) {
+                remainingUTXOValue += nValue;
+            }
+        }
+    }
+
+    if (useAny || useAnyNote || zaddrs.size() > 0) {
+        // Get available notes
+        std::vector<CNotePlaintextEntry> entries;
+        pwalletMain->GetFilteredNotes(entries, zaddrs);
+
+        // Find unspent notes and update estimated size
+        for (CNotePlaintextEntry& entry : entries) {
+            noteCounter++;
+            CAmount nValue = entry.plaintext.value;
+
+            if (!maxedOutNotesFlag) {
+                // If we haven't added any notes yet and the merge is to a
+                // z-address, we have already accounted for the first JoinSplit.
+                size_t increase = (noteInputs.empty() && !isToZaddr) || (noteInputs.size() % 2 == 0) ? JOINSPLIT_SIZE : 0;
+                if (estimatedTxSize + increase >= MAX_TX_SIZE ||
+                    (nNoteLimit > 0 && noteCounter > nNoteLimit))
+                {
+                    maxedOutNotesFlag = true;
+                } else {
+                    estimatedTxSize += increase;
+                    SpendingKey zkey;
+                    pwalletMain->GetSpendingKey(entry.address, zkey);
+                    noteInputs.emplace_back(entry.jsop, entry.plaintext.note(entry.address), nValue, zkey);
+                    mergedNoteValue += nValue;
+                }
+            }
+
+            if (maxedOutNotesFlag) {
+                remainingNoteValue += nValue;
+            }
+        }
+    }
+
+    size_t numUtxos = utxoInputs.size();
+    size_t numNotes = noteInputs.size();
+
+    if (numUtxos == 0 && numNotes == 0) {
+        throw JSONRPCError(RPC_WALLET_INSUFFICIENT_FUNDS, "Could not find any funds to merge.");
+    }
+
+    CAmount mergedValue = mergedUTXOValue + mergedNoteValue;
+    if (mergedValue < nFee) {
+        throw JSONRPCError(RPC_WALLET_INSUFFICIENT_FUNDS,
+            strprintf("Insufficient funds, have %s, which is less than miners fee %s",
+            FormatMoney(mergedValue), FormatMoney(nFee)));
+    }
+
+    // Check that the user specified fee is sane (if too high, it can result in error -25 absurd fee)
+    CAmount netAmount = mergedValue - nFee;
+    if (nFee > netAmount) {
+        throw JSONRPCError(RPC_INVALID_PARAMETER, strprintf("Fee %s is greater than the net amount to be shielded %s", FormatMoney(nFee), FormatMoney(netAmount)));
+    }
+
+    // Keep record of parameters in context object
+    UniValue contextInfo(UniValue::VOBJ);
+    contextInfo.push_back(Pair("fromaddresses", params[0]));
+    contextInfo.push_back(Pair("toaddress", params[1]));
+    contextInfo.push_back(Pair("fee", ValueFromAmount(nFee)));
+
+    // Create operation and add to global queue
+    std::shared_ptr<AsyncRPCQueue> q = getAsyncRPCQueue();
+    std::shared_ptr<AsyncRPCOperation> operation(
+        new AsyncRPCOperation_mergetoaddress(utxoInputs, noteInputs, recipient, nFee, contextInfo) );
+    q->addOperation(operation);
+    AsyncRPCOperationId operationId = operation->getId();
+
+    // Return continuation information
+    UniValue o(UniValue::VOBJ);
+    o.push_back(Pair("remainingUTXOs", utxoCounter - numUtxos));
+    o.push_back(Pair("remainingTransparentValue", ValueFromAmount(remainingUTXOValue)));
+    o.push_back(Pair("remainingNotes", noteCounter - numNotes));
+    o.push_back(Pair("remainingShieldedValue", ValueFromAmount(remainingNoteValue)));
+    o.push_back(Pair("mergingUTXOs", numUtxos));
+    o.push_back(Pair("mergingTransparentValue", ValueFromAmount(mergedUTXOValue)));
+    o.push_back(Pair("mergingNotes", numNotes));
+    o.push_back(Pair("mergingShieldedValue", ValueFromAmount(mergedNoteValue)));
     o.push_back(Pair("opid", operationId));
     return o;
 }
