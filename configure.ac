@@ -695,7 +695,7 @@ AC_CHECK_LIB([gmpxx],[main],GMPXX_LIBS=-lgmpxx, [AC_MSG_ERROR(libgmpxx missing)]
 
 RUST_LIBS=""
 if test x$enable_rust != xno; then
-  RUST_LIBS="-lrustzcash"
+  RUST_LIBS="-lrustzcash -ldl"
 fi
 
 dnl Check for OpenMP support
