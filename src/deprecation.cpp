@@ -4,6 +4,7 @@
 
 #include "deprecation.h"
 
+#include "alert.h"
 #include "clientversion.h"
 #include "init.h"
 #include "ui_interface.h"
@@ -11,7 +12,7 @@
 
 static const std::string CLIENT_VERSION_STR = FormatVersion(CLIENT_VERSION);
 
-void EnforceNodeDeprecation(int nHeight, bool forceLogging) {
+void EnforceNodeDeprecation(int nHeight, bool forceLogging, bool fThread) {
     int blocksToDeprecation = DEPRECATION_HEIGHT - nHeight;
     bool disableDeprecation = (GetArg("-disabledeprecation", "") == CLIENT_VERSION_STR);
     if (blocksToDeprecation <= 0) {
@@ -30,6 +31,7 @@ void EnforceNodeDeprecation(int nHeight, bool forceLogging) {
                                        "-disabledeprecation=", CLIENT_VERSION_STR);
             }
             LogPrintf("*** %s\n", msg);
+            CAlert::Notify(msg, fThread);
             uiInterface.ThreadSafeMessageBox(msg, "", CClientUIInterface::MSG_ERROR);
         }
         if (!disableDeprecation) {
@@ -50,6 +52,7 @@ void EnforceNodeDeprecation(int nHeight, bool forceLogging) {
                             "-disabledeprecation=", CLIENT_VERSION_STR);
         }
         LogPrintf("*** %s\n", msg);
+        CAlert::Notify(msg, fThread);
         uiInterface.ThreadSafeMessageBox(msg, "", CClientUIInterface::MSG_WARNING);
     }
 }
