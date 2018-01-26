@@ -40,6 +40,8 @@ struct Params {
     int nMajorityRejectBlockOutdated;
     int nMajorityWindow;
     /** Proof of work parameters */
+    unsigned int nEquihashN = 0;
+    unsigned int nEquihashK = 0;
     uint256 powLimit;
     int64_t nPowAveragingWindow;
     int64_t nPowMaxAdjustDown;

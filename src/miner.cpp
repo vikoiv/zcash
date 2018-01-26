@@ -509,8 +509,8 @@ void static BitcoinMiner()
     // Each thread has its own counter
     unsigned int nExtraNonce = 0;
 
-    unsigned int n = chainparams.EquihashN();
-    unsigned int k = chainparams.EquihashK();
+    unsigned int n = chainparams.GetConsensus().nEquihashN;
+    unsigned int k = chainparams.GetConsensus().nEquihashK;
 
     std::string solver = GetArg("-equihashsolver", "default");
     assert(solver == "tromp" || solver == "default");

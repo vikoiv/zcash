@@ -70,8 +70,6 @@ public:
     bool RequireStandard() const { return fRequireStandard; }
     int64_t MaxTipAge() const { return nMaxTipAge; }
     int64_t PruneAfterHeight() const { return nPruneAfterHeight; }
-    unsigned int EquihashN() const { return nEquihashN; }
-    unsigned int EquihashK() const { return nEquihashK; }
     std::string CurrencyUnits() const { return strCurrencyUnits; }
     /** Make miner stop after a block is found. In RPC, don't return until nGenProcLimit blocks are generated */
     bool MineBlocksOnDemand() const { return fMineBlocksOnDemand; }
@@ -99,8 +97,6 @@ protected:
     int nDefaultPort = 0;
     long nMaxTipAge = 0;
     uint64_t nPruneAfterHeight = 0;
-    unsigned int nEquihashN = 0;
-    unsigned int nEquihashK = 0;
     std::vector<CDNSSeedData> vSeeds;
     std::vector<unsigned char> base58Prefixes[MAX_BASE58_TYPES];
     std::string strNetworkID;
