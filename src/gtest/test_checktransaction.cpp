@@ -45,6 +45,8 @@ public:
 
 
 CMutableTransaction GetValidTransaction() {
+    uint32_t consensusBranchId = SPROUT_BRANCH_ID;
+
     CMutableTransaction mtx;
     mtx.vin.resize(2);
     mtx.vin[0].prevout.hash = uint256S("0000000000000000000000000000000000000000000000000000000000000001");
@@ -74,7 +76,7 @@ CMutableTransaction GetValidTransaction() {
     // Empty output script.
     CScript scriptCode;
     CTransaction signTx(mtx);
-    uint256 dataToBeSigned = SignatureHash(scriptCode, signTx, NOT_AN_INPUT, SIGHASH_ALL, 0, SIGVERSION_BASE);
+    uint256 dataToBeSigned = SignatureHash(scriptCode, signTx, NOT_AN_INPUT, SIGHASH_ALL, 0, consensusBranchId);
     if (dataToBeSigned == one) {
         throw std::runtime_error("SignatureHash failed");
     }
