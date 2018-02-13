@@ -178,6 +178,14 @@ class WalletMergeToAddressTest (BitcoinTestFramework):
             errorString = e.error['message']
         assert_equal("JSON integer out of range" in errorString, True)
 
+        # Merging will fail for this specific case where it would spend a fee and do nothing
+        try:
+            self.nodes[0].z_mergetoaddress([mytaddr], mytaddr)
+            assert(False)
+        except JSONRPCException,e:
+            errorString = e.error['message']
+        assert_equal("Destination address is also the only source address, and all its funds are already merged" in errorString, True)
+
         # Merge UTXOs from node 0 of value 30, standard fee of 0.00010000
         result = self.nodes[0].z_mergetoaddress([mytaddr, mytaddr2, mytaddr3], myzaddr)
         self.wait_and_assert_operationid_status(0, result['opid'])

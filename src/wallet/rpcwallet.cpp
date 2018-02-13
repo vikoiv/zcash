@@ -4007,6 +4007,14 @@ UniValue z_mergetoaddress(const UniValue& params, bool fHelp)
         throw JSONRPCError(RPC_WALLET_INSUFFICIENT_FUNDS, "Could not find any funds to merge.");
     }
 
+    // Sanity check: Don't do anything if:
+    // - We only have one from address
+    // - It's equal to toaddress
+    // - The address only contains a single UTXO or note
+    if (setAddress.size() == 1 && setAddress.count(destaddress) && (numUtxos + numNotes) == 1) {
+        throw JSONRPCError(RPC_INVALID_PARAMETER, "Destination address is also the only source address, and all its funds are already merged.");
+    }
+
     CAmount mergedValue = mergedUTXOValue + mergedNoteValue;
     if (mergedValue < nFee) {
         throw JSONRPCError(RPC_WALLET_INSUFFICIENT_FUNDS,
