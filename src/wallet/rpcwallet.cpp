@@ -3759,7 +3759,7 @@ UniValue z_mergetoaddress(const UniValue& params, bool fHelp)
             "\nArguments:\n"
             "1. fromaddresses         (string, required) A JSON array with addresses.\n"
             "                         The following special strings are accepted inside the array:\n"
-            "                             - \"*\": Merge both UTXOs and notes from all addressed belonging to the wallet.\n"
+            "                             - \"*\": Merge both UTXOs and notes from all addresses belonging to the wallet.\n"
             "                             - \"ANY_TADDR\": Merge UTXOs from all t-addrs belonging to the wallet.\n"
             "                             - \"ANY_ZADDR\": Merge notes from all z-addrs belonging to the wallet.\n"
             "                         If a special string is given, any given addresses of that type will be ignored.\n"
@@ -3767,14 +3767,14 @@ UniValue z_mergetoaddress(const UniValue& params, bool fHelp)
             "      \"address\"            (string) Can be a t-addr or a z-addr\n"
             "      ,...\n"
             "    ]\n"
-            "2. \"toaddress\"           (string, required) The taddr or zaddr to send the funds to.\n"
+            "2. \"toaddress\"           (string, required) The t-addr or z-addr to send the funds to.\n"
             "3. fee                   (numeric, optional, default="
             + strprintf("%s", FormatMoney(MERGE_TO_ADDRESS_OPERATION_DEFAULT_MINERS_FEE)) + ") The fee amount to attach to this transaction.\n"
-            "4. utxo_limit            (numeric, optional, default="
+            "4. transparent_limit     (numeric, optional, default="
             + strprintf("%d", MERGE_TO_ADDRESS_DEFAULT_TRANSPARENT_LIMIT) + ") Limit on the maximum number of UTXOs to merge.  Set to 0 to use node option -mempooltxinputlimit.\n"
-            "4. note_limit            (numeric, optional, default="
+            "4. shielded_limit        (numeric, optional, default="
             + strprintf("%d", MERGE_TO_ADDRESS_DEFAULT_SHIELDED_LIMIT) + ") Limit on the maximum number of notes to merge.  Set to 0 to merge as many as will fit in the transaction.\n"
-            "5. \"memo\"                (string, optional) If toaddress is a zaddr, this will be put in the memo field of the new note.\n"
+            "5. \"memo\"                (string, optional) Encoded as hex. When toaddress is a z-addr, this will be stored in the memo field of the new note.\n"
             "\nResult:\n"
             "{\n"
             "  \"remainingUTXOs\": xxx               (numeric) Number of UTXOs still available for merging.\n"
@@ -3809,7 +3809,7 @@ UniValue z_mergetoaddress(const UniValue& params, bool fHelp)
         throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid parameter, fromaddresses array is empty.");
 
     // Keep track of addresses to spot duplicates
-    set<std::string> setAddress;
+    std::set<std::string> setAddress;
 
     // Sources
     for (const UniValue& o : addresses.getValues()) {
@@ -3890,7 +3890,7 @@ UniValue z_mergetoaddress(const UniValue& params, bool fHelp)
         }
     }
 
-    string memo;
+    std::string memo;
     if (params.size() > 5) {
         memo = params[5].get_str();
         if (!isToZaddr) {
