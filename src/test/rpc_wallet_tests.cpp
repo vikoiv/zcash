@@ -1400,6 +1400,10 @@ BOOST_AUTO_TEST_CASE(rpc_z_mergetoaddress_parameters)
 
     // bad from address
     BOOST_CHECK_THROW(CallRPC("z_mergetoaddress "
+    "[\"**\"] tnpoQJVnYBZZqkFadj2bJJLThNCxbADGB5gSGeYTAGGrT5tejsxY9Zc1BtY8nnHmZkB"), runtime_error);
+
+    // bad from address
+    BOOST_CHECK_THROW(CallRPC("z_mergetoaddress "
     "tmRr6yJonqGK23UVhrKuyvTpF8qxQQjKigJ tnpoQJVnYBZZqkFadj2bJJLThNCxbADGB5gSGeYTAGGrT5tejsxY9Zc1BtY8nnHmZkB"), runtime_error);
 
     // bad from address

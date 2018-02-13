@@ -3758,10 +3758,11 @@ UniValue z_mergetoaddress(const UniValue& params, bool fHelp)
             + HelpRequiringPassphrase() + "\n"
             "\nArguments:\n"
             "1. fromaddresses         (string, required) A JSON array with addresses.\n"
-            "                         The following special strings are also accepted:\n"
+            "                         The following special strings are accepted inside the array:\n"
             "                             - \"*\": Merge both UTXOs and notes from all addressed belonging to the wallet.\n"
-            "                             - \"ANY_TADDR\": Merge UTXOs from all taddrs belonging to the wallet.\n"
-            "                             - \"ANY_ZADDR\": Merge notes from all zaddrs belonging to the wallet.\n"
+            "                             - \"ANY_TADDR\": Merge UTXOs from all t-addrs belonging to the wallet.\n"
+            "                             - \"ANY_ZADDR\": Merge notes from all z-addrs belonging to the wallet.\n"
+            "                         If a special string is given, any given addresses of that type will be ignored.\n"
             "    [\n"
             "      \"address\"            (string) Can be a t-addr or a z-addr\n"
             "      ,...\n"
@@ -3797,47 +3798,56 @@ UniValue z_mergetoaddress(const UniValue& params, bool fHelp)
 
     LOCK2(cs_main, pwalletMain->cs_wallet);
 
-    // Validate the from addresses
-    std::string fromaddresses = "";
-    if (params[0].isStr()) {
-        fromaddresses = params[0].get_str();
-    }
-    bool useAny = fromaddresses == "*";
-    bool useAnyUTXO = fromaddresses == "ANY_TADDR";
-    bool useAnyNote = fromaddresses == "ANY_ZADDR";
+    bool useAny = false;
+    bool useAnyUTXO = false;
+    bool useAnyNote = false;
     std::set<CBitcoinAddress> taddrs = {};
     std::set<libzcash::PaymentAddress> zaddrs = {};
-    if (!(useAny || useAnyUTXO || useAnyNote)) {
-        UniValue outputs = params[0].get_array();
 
-        if (outputs.size()==0)
-            throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid parameter, fromaddresses array is empty.");
+    UniValue addresses = params[0].get_array();
+    if (addresses.size()==0)
+        throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid parameter, fromaddresses array is empty.");
 
-        // Keep track of addresses to spot duplicates
-        set<std::string> setAddress;
+    // Keep track of addresses to spot duplicates
+    set<std::string> setAddress;
 
-        // Sources
-        for (const UniValue& o : outputs.getValues()) {
-            if (!o.isStr())
-                throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid parameter, expected string");
+    // Sources
+    for (const UniValue& o : addresses.getValues()) {
+        if (!o.isStr())
+            throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid parameter, expected string");
 
-            string address = o.get_str();
+        std::string address = o.get_str();
+        if (address == "*") {
+            useAny = true;
+        } else if (address == "ANY_TADDR") {
+            useAnyUTXO = true;
+        } else if (address == "ANY_ZADDR") {
+            useAnyNote = true;
+        } else {
             CBitcoinAddress taddr(address);
             if (taddr.IsValid()) {
-                taddrs.insert(taddr);
+                // Ignore any listed t-addrs if we are using all of them
+                if (!(useAny || useAnyUTXO)) {
+                    taddrs.insert(taddr);
+                }
             } else {
                 try {
                     CZCPaymentAddress zaddr(address);
-                    zaddrs.insert(zaddr.Get());
+                    // Ignore listed z-addrs if we are using all of them
+                    if (!(useAny || useAnyNote)) {
+                        zaddrs.insert(zaddr.Get());
+                    }
                 } catch (const std::runtime_error&) {
-                    throw JSONRPCError(RPC_INVALID_PARAMETER, string("Invalid parameter, unknown address format: ") + address);
+                    throw JSONRPCError(
+                        RPC_INVALID_PARAMETER,
+                        string("Invalid parameter, unknown address format: ") + address);
                 }
             }
-
-            if (setAddress.count(address))
-                throw JSONRPCError(RPC_INVALID_PARAMETER, string("Invalid parameter, duplicated address: ") + address);
-            setAddress.insert(address);
         }
+
+        if (setAddress.count(address))
+            throw JSONRPCError(RPC_INVALID_PARAMETER, string("Invalid parameter, duplicated address: ") + address);
+        setAddress.insert(address);
     }
 
     // Validate the destination address
