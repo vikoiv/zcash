@@ -570,15 +570,21 @@ bool AsyncRPCOperation_mergetoaddress::main_impl()
 
         // create output for any change
         if (jsChange > 0) {
+            std::string outputType = "change";
             auto jso = JSOutput(changeAddress, jsChange);
-            // If this is the final output, set the memo
-            if (isToZaddr_ && vpubNewProcessed && !hexMemo.empty()) {
-                jso.memo = get_memo_from_hex_string(hexMemo);
+            // If this is the final output, set the target and memo
+            if (isToZaddr_ && vpubNewProcessed) {
+                outputType = "target";
+                jso.addr = toPaymentAddress_;
+                if (!hexMemo.empty()) {
+                    jso.memo = get_memo_from_hex_string(hexMemo);
+                }
             }
             info.vjsout.push_back(jso);
 
-            LogPrint("zrpcunsafe", "%s: generating note for change (amount=%s)\n",
+            LogPrint("zrpcunsafe", "%s: generating note for %s (amount=%s)\n",
                      getId(),
+                     outputType,
                      FormatMoney(jsChange));
         }
 
