@@ -334,5 +334,15 @@ class WalletMergeToAddressTest (BitcoinTestFramework):
         self.nodes[1].generate(1)
         self.sync_all()
 
+        # Shield both UTXOs and notes to a z-addr
+        result = self.nodes[0].z_mergetoaddress(["*"], myzaddr, 0, 10, 2)
+        assert_equal(result["mergingUTXOs"], Decimal('10'))
+        assert_equal(result["remainingUTXOs"], Decimal('7'))
+        assert_equal(result["mergingNotes"], Decimal('2'))
+        assert_equal(result["remainingNotes"], Decimal('2'))
+        wait_and_assert_operationid_status(self.nodes[0], result['opid'])
+        self.nodes[1].generate(1)
+        self.sync_all()
+
 if __name__ == '__main__':
     WalletMergeToAddressTest().main()
