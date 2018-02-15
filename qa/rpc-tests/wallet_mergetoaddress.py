@@ -180,9 +180,10 @@ class WalletMergeToAddressTest (BitcoinTestFramework):
         assert_equal(result["mergingNotes"], Decimal('2'))
         assert_equal(result["remainingNotes"], Decimal('0'))
         wait_and_assert_operationid_status(self.nodes[0], result['opid'])
-        self.nodes[1].generate(1)
+        blockhash = self.nodes[1].generate(1)
         self.sync_all()
 
+        assert_equal(len(self.nodes[0].getblock(blockhash[0])['tx']), 2)
         assert_equal(self.nodes[0].z_getbalance(myzaddr), 0)
         assert_equal(self.nodes[0].z_getbalance(myzaddr2), Decimal('39.99990000'))
 
