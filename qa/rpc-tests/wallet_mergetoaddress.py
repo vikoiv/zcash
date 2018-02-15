@@ -172,6 +172,20 @@ class WalletMergeToAddressTest (BitcoinTestFramework):
         assert_equal(self.nodes[1].getbalance(), 40)
         assert_equal(self.nodes[2].getbalance(), 30)
 
+        # Shield all notes to another z-addr
+        myzaddr2 = self.nodes[0].z_getnewaddress()
+        result = self.nodes[0].z_mergetoaddress(["ANY_ZADDR"], myzaddr2, 0)
+        assert_equal(result["mergingUTXOs"], Decimal('0'))
+        assert_equal(result["remainingUTXOs"], Decimal('0'))
+        assert_equal(result["mergingNotes"], Decimal('2'))
+        assert_equal(result["remainingNotes"], Decimal('0'))
+        wait_and_assert_operationid_status(self.nodes[0], result['opid'])
+        self.nodes[1].generate(1)
+        self.sync_all()
+
+        assert_equal(self.nodes[0].z_getbalance(myzaddr), 0)
+        assert_equal(self.nodes[0].z_getbalance(myzaddr2), Decimal('39.99990000'))
+
         # Shield coinbase UTXOs from any node 2 taddr, and set fee to 0
         result = self.nodes[2].z_shieldcoinbase("*", myzaddr, 0)
         wait_and_assert_operationid_status(self.nodes[2], result['opid'])
@@ -180,8 +194,9 @@ class WalletMergeToAddressTest (BitcoinTestFramework):
         self.sync_all()
 
         assert_equal(self.nodes[0].getbalance(), 10)
-        assert_equal(self.nodes[0].z_getbalance(myzaddr), Decimal('69.99990000'))
-        assert_equal(self.nodes[1].getbalance(), 50)
+        assert_equal(self.nodes[0].z_getbalance(myzaddr), Decimal('30'))
+        assert_equal(self.nodes[0].z_getbalance(myzaddr2), Decimal('39.99990000'))
+        assert_equal(self.nodes[1].getbalance(), 60)
         assert_equal(self.nodes[2].getbalance(), 0)
 
         # Merge all notes from node 0 into a node 0 taddr, and set fee to 0
@@ -195,7 +210,8 @@ class WalletMergeToAddressTest (BitcoinTestFramework):
         assert_equal(self.nodes[0].z_getbalance(do_not_shield_taddr), Decimal('10.0'))
         assert_equal(self.nodes[0].z_getbalance(mytaddr), Decimal('69.99990000'))
         assert_equal(self.nodes[0].z_getbalance(myzaddr), 0)
-        assert_equal(self.nodes[1].getbalance(), 60)
+        assert_equal(self.nodes[0].z_getbalance(myzaddr2), 0)
+        assert_equal(self.nodes[1].getbalance(), 70)
         assert_equal(self.nodes[2].getbalance(), 0)
 
         # Merge all node 0 UTXOs together into a node 1 taddr, and set fee to 0
@@ -211,7 +227,7 @@ class WalletMergeToAddressTest (BitcoinTestFramework):
         assert_equal(self.nodes[0].z_getbalance(do_not_shield_taddr), 0)
         assert_equal(self.nodes[0].z_getbalance(mytaddr), 0)
         assert_equal(self.nodes[0].z_getbalance(myzaddr), 0)
-        assert_equal(self.nodes[1].getbalance(), Decimal('149.99990000'))
+        assert_equal(self.nodes[1].getbalance(), Decimal('159.99990000'))
         assert_equal(self.nodes[1].z_getbalance(n1taddr), Decimal('79.99990000'))
         assert_equal(self.nodes[2].getbalance(), 0)
 
