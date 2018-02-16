@@ -382,7 +382,6 @@ bool AsyncRPCOperation_mergetoaddress::main_impl()
             }
             info.vpub_old += vpubOldTarget; // funds flowing from public pool
             vpubOldProcessed = true;
-            jsChange += vpubOldTarget;
         }
 
         CAmount jsInputValue = 0;
@@ -548,7 +547,7 @@ bool AsyncRPCOperation_mergetoaddress::main_impl()
         }
 
         // Accumulate change
-        jsChange = jsInputValue;
+        jsChange = jsInputValue + info.vpub_old;
 
         // Set vpub_new in the last joinsplit (when there are no more notes to spend)
         if (zInputsDeque.empty()) {
